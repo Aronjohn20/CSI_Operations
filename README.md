@@ -4,22 +4,39 @@ An operational orchestration and event automation platform for the Computer Soci
 
 ---
 
-## 📁 Documentation & Specifications
-
-All core architecture, business rules, design tokens, and planning documents are organized inside the [`md_files/`](file:///r:/VSCODE/CSI_Operations/md_files/) directory:
-
-- [**`md_files/PROJECT_CONTEXT.md`**](file:///r:/VSCODE/CSI_Operations/md_files/PROJECT_CONTEXT.md): Background, mission, and scope.
-- [**`md_files/ARCHITECTURE.md`**](file:///r:/VSCODE/CSI_Operations/md_files/ARCHITECTURE.md): System architecture and data flow diagram.
-- [**`md_files/BUSINESS_RULES.md`**](file:///r:/VSCODE/CSI_Operations/md_files/BUSINESS_RULES.md): Business rules, 23-member allocation, document generation, and admin secret.
-- [**`md_files/UI_UX_SPEC.md`**](file:///r:/VSCODE/CSI_Operations/md_files/UI_UX_SPEC.md): CSI color palette, typography, and component styling.
-- [**`md_files/DATABASE_SPEC.md`**](file:///r:/VSCODE/CSI_Operations/md_files/DATABASE_SPEC.md): PostgreSQL / Supabase table schemas and DDL.
-- [**`md_files/IMPLEMENTATION_PLAN.md`**](file:///r:/VSCODE/CSI_Operations/md_files/IMPLEMENTATION_PLAN.md): Feature-by-feature phased roadmap.
-- [**`md_files/AGENTS.md`**](file:///r:/VSCODE/CSI_Operations/md_files/AGENTS.md): Strict pair programming instructions.
+## 🚀 Overview
+A unified platform for organizing, documenting, and executing college technical events:
+- Single-entry event creation triggering auto-generated documents (Permission Letters, Registration Forms, RSMS Notices, Attendance Sheets).
+- Member availability & workload tracking across the 23-member roster.
+- Certificate generation directly driven by feedback form responses.
+- Historical event archive and reporting.
 
 ---
 
-## 🚀 Development Workflow
-We build **one feature at a time**:
-1. Implement single feature according to specification.
-2. Test and verify thoroughly.
-3. Obtain user confirmation before advancing to the next milestone.
+## 🛠️ Tech Stack
+- **Framework**: Next.js 14 (App Router) + TypeScript
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+- **Hosting**: Vercel
+
+---
+
+## 💻 Getting Started
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Aronjohn20/CSI_Operations.git
+   cd CSI_Operations
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
