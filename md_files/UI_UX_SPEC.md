@@ -40,3 +40,4 @@ Status & Feedback Colors:
 - **Cards**: Soft borders (`border border-slate-200`), rounded corners (`rounded-xl`), subtle shadows (`shadow-sm hover:shadow-md transition`).
 - **Modals**: Center-staged, dim backdrop (`bg-slate-900/50 backdrop-blur-sm`).
 - **Inputs & Dropdowns**: Focus rings with `ring-2 ring-blue-500`, high contrast, clear placeholder text.
+

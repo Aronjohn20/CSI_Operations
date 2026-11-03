@@ -70,3 +70,4 @@ Each event operates in an isolated container that encapsulates:
 - **QR Code Renderer**: Renders downloadable/projectable QR codes linked directly to the feedback form.
 - **Certificate Engine**: Canvas/PDF rendering pipeline driven by feedback submission data and winner selections.
 - **Admin Easter Egg**: Secret authenticated backdoor protected by security verification (`Favorite club?` -> `Bayern Munich`).
+

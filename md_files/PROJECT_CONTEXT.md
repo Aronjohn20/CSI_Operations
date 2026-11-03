@@ -27,3 +27,4 @@ A unified, single-source-of-truth dashboard where entering event details once au
 - **Hosting Platform**: Vercel
 - **Version Control**: GitHub (`Aronjohn20/CSI_Operations`)
 - **Database**: Supabase / Serverless PostgreSQL
+

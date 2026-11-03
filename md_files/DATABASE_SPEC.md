@@ -76,3 +76,4 @@ CREATE TABLE event_winners (
     UNIQUE (event_id, position)
 );
 ```
+

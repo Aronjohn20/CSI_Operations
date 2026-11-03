@@ -26,3 +26,4 @@ To ensure high quality, zero confusion, and clean development, follow these rule
      1. What was built.
      2. How to test it locally.
      3. Request user confirmation before starting the next feature.
+

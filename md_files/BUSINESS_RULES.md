@@ -67,3 +67,4 @@ Upon saving an event:
    - Accesses the Coordinator Certificate generator.
    - Automatically pulls coordinator names from that specific event's RSMS Notice / Event Info.
    - Generates official **Certificate of Appreciation / Coordination** for the assigned coordinators.
+

@@ -54,3 +54,4 @@ Each phase must be completed, tested, and approved before moving to the next.
 ## Phase 7: Events Hosted Archive (`/events`)
 - [ ] 7.1 Master event history list showing past & ongoing events with status badges.
 - [ ] 7.2 Full integration test & build verification.
+
