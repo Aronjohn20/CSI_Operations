@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Sparkles, UserCheck, Calendar, Clock, MapPin, Users, FileText, Check, AlertCircle } from "lucide-react";
-import { Member } from "@/lib/types";
+import { X, Sparkles, UserCheck, Calendar, Check, ArrowRight, ArrowLeft } from "lucide-react";
+import { Member, BRANCHES } from "@/lib/types";
 import { getStoredMembers, saveNewEvent } from "@/lib/eventsStorage";
 
 interface CreateEventModalProps {
@@ -16,6 +16,9 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
   const router = useRouter();
   const members: Member[] = getStoredMembers();
 
+  // Wizard Step: 1 = Event Details, 2 = Coordinator Allocation
+  const [step, setStep] = useState<1 | 2>(1);
+
   // Form states
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState("");
@@ -23,47 +26,69 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
   const [timeEnd, setTimeEnd] = useState("04:30 PM");
   const [mode, setMode] = useState<"Offline" | "Online">("Offline");
   const [venue, setVenue] = useState("");
-  const [targetClass, setTargetClass] = useState("S3, S5, S7 CS/IT");
-  const [facultyInCharge, setFacultyInCharge] = useState("Dr. Binu A (Faculty Advisor)");
+  const [targetBranches, setTargetBranches] = useState<string[]>([...BRANCHES]);
   const [briefDescription, setBriefDescription] = useState("");
   const [requiredCoordinators, setRequiredCoordinators] = useState(2);
   const [selectedCoordinators, setSelectedCoordinators] = useState<string[]>([]);
-
-  // Coordinator search
   const [coordSearch, setCoordSearch] = useState("");
 
   if (!isOpen) return null;
 
-  // Toggle coordinator
+  const handleClose = () => {
+    setStep(1);
+    onClose();
+  };
+
+  // Branch Selection
+  const toggleBranch = (branch: string) => {
+    if (targetBranches.includes(branch)) {
+      setTargetBranches(targetBranches.filter((b) => b !== branch));
+    } else {
+      setTargetBranches([...targetBranches, branch]);
+    }
+  };
+
+  const selectAllBranches = () => {
+    if (targetBranches.length === BRANCHES.length) {
+      setTargetBranches([]);
+    } else {
+      setTargetBranches([...BRANCHES]);
+    }
+  };
+
+  // Coordinator Selection
   const toggleCoordinator = (name: string) => {
     if (selectedCoordinators.includes(name)) {
       setSelectedCoordinators(selectedCoordinators.filter((c) => c !== name));
     } else {
       if (selectedCoordinators.length >= requiredCoordinators) {
-        // Can't select more than required
         return;
       }
       setSelectedCoordinators([...selectedCoordinators, name]);
     }
   };
 
-  // Filter members
   const filteredMembers = members.filter((m) =>
     m.name.toLowerCase().includes(coordSearch.toLowerCase()) ||
     m.domain.toLowerCase().includes(coordSearch.toLowerCase()) ||
     m.class_batch.toLowerCase().includes(coordSearch.toLowerCase())
   );
-
-  // Sort members so those with fewest assignments appear first (fair workload allocation)
   const sortedMembers = [...filteredMembers].sort((a, b) => a.events_coordinated_count - b.events_coordinated_count);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const goToStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventName.trim() || !eventDate || !venue.trim()) {
-      alert("Please fill in Event Name, Date, and Venue.");
+      alert("Please enter Event Name, Date, and Venue before proceeding.");
       return;
     }
+    if (!mode) {
+      alert("Please select Event Mode (Offline or Online).");
+      return;
+    }
+    setStep(2);
+  };
 
+  const handleFinalSubmit = () => {
     const created = saveNewEvent({
       event_name: eventName,
       event_date: eventDate,
@@ -71,15 +96,15 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
       time_end: timeEnd,
       mode,
       venue,
-      target_class: targetClass,
-      faculty_in_charge: facultyInCharge,
+      target_branches: targetBranches.length > 0 ? targetBranches : [...BRANCHES],
+      faculty_in_charge: "Dr. Binu A (Faculty Advisor)",
       brief_description: briefDescription,
       status: "confirmed",
       required_coordinators: requiredCoordinators,
       assigned_coordinators: selectedCoordinators,
     });
 
-    onClose();
+    handleClose();
     if (onEventCreated) {
       onEventCreated(created.id);
     }
@@ -87,40 +112,43 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-csi-surface border border-csi-border w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-csi-border flex items-center justify-between bg-csi-sidebar">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-lg bg-csi-purple/20 text-csi-purpleLight flex items-center justify-center font-bold">
-              <Sparkles className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+      <div className="bg-[#12101C] border border-purple-500/40 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden my-6 max-h-[92vh] flex flex-col text-white">
+        {/* Header with Step Indicator */}
+        <div className="px-7 py-5 border-b border-purple-500/20 flex items-center justify-between bg-[#0B0912]">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-11 h-11 rounded-xl bg-purple-600/30 text-purple-300 flex items-center justify-center font-bold">
+              <Sparkles className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Create New Event</h2>
-              <p className="text-xs text-csi-textDim">Single Source of Truth: Informs all letters, forms, and notices</p>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-white tracking-wide">
+                  Create Event Container
+                </h2>
+                <span className="text-xs px-3 py-1 rounded-full font-bold bg-purple-900/60 text-purple-200 border border-purple-500/40">
+                  Step {step} of 2: {step === 1 ? "Event Details" : "Coordinator Allocation"}
+                </span>
+              </div>
+              <p className="text-sm text-slate-300 mt-0.5">
+                {step === 1 ? "Configure core event parameters" : "Assign coordinators from the 23-member roster"}
+              </p>
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-csi-textDim hover:text-white hover:bg-csi-surfaceLight transition"
+            onClick={handleClose}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Modal Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1">
-          {/* Section 1: Core Event Info */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-semibold text-csi-purpleLight uppercase tracking-wider flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              1. Event Details
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* STEP 1: EVENT DETAILS ONLY */}
+        {step === 1 && (
+          <form onSubmit={goToStep2} className="p-7 overflow-y-auto space-y-6 flex-1 bg-[#12101C]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-medium text-csi-textMuted mb-1.5">
-                  Event Name <span className="text-red-400">*</span>
+                <label className="block text-[18px] font-bold text-white mb-2">
+                  Event Name <span className="text-red-400 font-extrabold">*</span>
                 </label>
                 <input
                   type="text"
@@ -128,35 +156,38 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
                   placeholder="e.g. NextGen Web & AI Hackathon"
                   value={eventName}
                   onChange={(e) => setEventName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-csi-dark border border-csi-border text-sm text-white focus:outline-none focus:border-csi-purple focus:ring-1 focus:ring-csi-purple transition placeholder:text-csi-textDim"
+                  className="w-full px-4 py-3 rounded-xl bg-black border border-purple-500/50 text-[18px] text-white focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition placeholder:text-slate-500 font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-csi-textMuted mb-1.5">
-                  Event Date <span className="text-red-400">*</span>
+                <label className="block text-[18px] font-bold text-white mb-2">
+                  Event Date <span className="text-red-400 font-extrabold">*</span>
                 </label>
                 <input
                   type="date"
                   required
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-csi-dark border border-csi-border text-sm text-white focus:outline-none focus:border-csi-purple focus:ring-1 focus:ring-csi-purple transition"
+                  className="w-full px-4 py-3 rounded-xl bg-black border border-purple-500/50 text-[18px] text-white focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition font-medium"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              {/* Mode is Required */}
               <div>
-                <label className="block text-xs font-medium text-csi-textMuted mb-1.5">Mode</label>
-                <div className="grid grid-cols-2 gap-2 bg-csi-dark p-1 rounded-lg border border-csi-border">
+                <label className="block text-[18px] font-bold text-white mb-2">
+                  Mode <span className="text-red-400 font-extrabold">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 bg-black p-1.5 rounded-xl border border-purple-500/50">
                   <button
                     type="button"
                     onClick={() => setMode("Offline")}
-                    className={`py-1.5 text-xs font-medium rounded-md transition ${
+                    className={`py-2 text-[18px] font-bold rounded-lg transition ${
                       mode === "Offline"
-                        ? "bg-csi-purple text-white shadow-sm"
-                        : "text-csi-textDim hover:text-white"
+                        ? "bg-purple-600 text-white shadow-md shadow-purple-600/40"
+                        : "text-slate-400 hover:text-white"
                     }`}
                   >
                     Offline
@@ -164,10 +195,10 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
                   <button
                     type="button"
                     onClick={() => setMode("Online")}
-                    className={`py-1.5 text-xs font-medium rounded-md transition ${
+                    className={`py-2 text-[18px] font-bold rounded-lg transition ${
                       mode === "Online"
-                        ? "bg-csi-purple text-white shadow-sm"
-                        : "text-csi-textDim hover:text-white"
+                        ? "bg-purple-600 text-white shadow-md shadow-purple-600/40"
+                        : "text-slate-400 hover:text-white"
                     }`}
                   >
                     Online
@@ -176,91 +207,126 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-csi-textMuted mb-1.5">
-                  Venue / Platform <span className="text-red-400">*</span>
+                <label className="block text-[18px] font-bold text-white mb-2">
+                  Venue / Platform <span className="text-red-400 font-extrabold">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder={mode === "Offline" ? "e.g. Lab 304 / Seminar Hall 1" : "e.g. Google Meet / HackerRank"}
+                  placeholder={mode === "Offline" ? "e.g. Seminar Hall 1" : "e.g. Google Meet Link"}
                   value={venue}
                   onChange={(e) => setVenue(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-lg bg-csi-dark border border-csi-border text-sm text-white focus:outline-none focus:border-csi-purple transition placeholder:text-csi-textDim"
+                  className="w-full px-4 py-3 rounded-xl bg-black border border-purple-500/50 text-[18px] text-white focus:outline-none focus:border-purple-400 transition placeholder:text-slate-500 font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-medium text-csi-textMuted mb-1.5">Start Time</label>
+                  <label className="block text-[18px] font-bold text-white mb-2">Start Time</label>
                   <input
                     type="text"
                     value={timeStart}
                     onChange={(e) => setTimeStart(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-csi-dark border border-csi-border text-xs text-white focus:outline-none focus:border-csi-purple"
+                    className="w-full px-3 py-3 rounded-xl bg-black border border-purple-500/50 text-[18px] text-white focus:outline-none focus:border-purple-400 font-medium"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-csi-textMuted mb-1.5">End Time</label>
+                  <label className="block text-[18px] font-bold text-white mb-2">End Time</label>
                   <input
                     type="text"
                     value={timeEnd}
                     onChange={(e) => setTimeEnd(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-csi-dark border border-csi-border text-xs text-white focus:outline-none focus:border-csi-purple"
+                    className="w-full px-3 py-3 rounded-xl bg-black border border-purple-500/50 text-[18px] text-white focus:outline-none focus:border-purple-400 font-medium"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-csi-textMuted mb-1.5">Target Audience / Class</label>
-                <input
-                  type="text"
-                  value={targetClass}
-                  onChange={(e) => setTargetClass(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-lg bg-csi-dark border border-csi-border text-sm text-white focus:outline-none focus:border-csi-purple transition"
-                />
+            {/* Target Audience: 9 Branches */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-[18px] font-bold text-white">
+                  Eligible Branches
+                </label>
+                <button
+                  type="button"
+                  onClick={selectAllBranches}
+                  className="text-sm text-purple-300 hover:text-white font-bold underline"
+                >
+                  {targetBranches.length === BRANCHES.length ? "Deselect All" : "Select All 9 Branches"}
+                </button>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-csi-textMuted mb-1.5">Faculty In-Charge</label>
-                <input
-                  type="text"
-                  value={facultyInCharge}
-                  onChange={(e) => setFacultyInCharge(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-lg bg-csi-dark border border-csi-border text-sm text-white focus:outline-none focus:border-csi-purple transition"
-                />
+              <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+                {BRANCHES.map((branch) => {
+                  const isSelected = targetBranches.includes(branch);
+                  return (
+                    <button
+                      key={branch}
+                      type="button"
+                      onClick={() => toggleBranch(branch)}
+                      className={`py-2 px-2 rounded-xl border text-[18px] font-bold transition flex items-center justify-center gap-1.5 ${
+                        isSelected
+                          ? "bg-purple-600/40 border-purple-400 text-white shadow-md shadow-purple-600/30"
+                          : "bg-black border-slate-800 text-slate-300 hover:border-slate-600 hover:text-white"
+                      }`}
+                    >
+                      <span>{branch}</span>
+                      {isSelected && <Check className="w-4 h-4 text-purple-200" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
+            {/* Brief Description */}
             <div>
-              <label className="block text-xs font-medium text-csi-textMuted mb-1.5">Brief Info / Description</label>
+              <label className="block text-[18px] font-bold text-white mb-2">Brief Summary / Info</label>
               <textarea
-                rows={2}
-                placeholder="Give a concise 2-line summary of what participants will learn or accomplish in this event..."
+                rows={3}
+                placeholder="Give a concise summary of what participants will accomplish in this event..."
                 value={briefDescription}
                 onChange={(e) => setBriefDescription(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-lg bg-csi-dark border border-csi-border text-sm text-white focus:outline-none focus:border-csi-purple transition placeholder:text-csi-textDim resize-none"
+                className="w-full px-4 py-3 rounded-xl bg-black border border-purple-500/50 text-[18px] text-white focus:outline-none focus:border-purple-400 placeholder:text-slate-500 resize-none font-medium leading-relaxed"
               />
             </div>
-          </div>
 
-          {/* Section 2: Coordinator Allocation Box */}
-          <div className="space-y-3 pt-4 border-t border-csi-border">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            {/* Step 1 Actions */}
+            <div className="pt-5 border-t border-purple-500/20 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-[18px] font-bold text-slate-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[18px] font-bold shadow-lg shadow-purple-600/30 transition flex items-center gap-2"
+              >
+                <span>Next: Allocate Coordinators</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 2: COORDINATOR ALLOCATION ONLY */}
+        {step === 2 && (
+          <div className="p-7 overflow-y-auto space-y-6 flex-1 bg-[#12101C]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/20 pb-4">
               <div>
-                <h3 className="text-xs font-semibold text-csi-purpleLight uppercase tracking-wider flex items-center gap-2">
-                  <UserCheck className="w-4 h-4" />
-                  2. Coordinator Allocation Box
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <UserCheck className="w-6 h-6 text-purple-400" />
+                  Coordinator Allocation Roster
                 </h3>
-                <p className="text-xs text-csi-textDim">
-                  Assign coordinators from the 23-member roster. Fair workload indicator highlights members with fewer assignments.
+                <p className="text-sm text-slate-300 mt-0.5">
+                  Assign coordinators from the 23-member roster. Light Workload tags indicate members with fewer past assignments.
                 </p>
               </div>
 
-              {/* Required counter */}
-              <div className="flex items-center gap-2 self-start sm:self-auto">
-                <span className="text-xs text-csi-textMuted">Required:</span>
+              <div className="flex items-center gap-3 self-start sm:self-auto bg-black p-2.5 rounded-xl border border-purple-500/40">
+                <span className="text-[18px] text-slate-300 font-bold">Required:</span>
                 <input
                   type="number"
                   min={1}
@@ -273,31 +339,31 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
                       setSelectedCoordinators(selectedCoordinators.slice(0, val));
                     }
                   }}
-                  className="w-14 px-2 py-1 rounded bg-csi-dark border border-csi-border text-xs text-white text-center font-bold focus:outline-none focus:border-csi-purple"
+                  className="w-14 px-2 py-1 rounded-lg bg-[#181622] border border-purple-500/50 text-[18px] text-white text-center font-bold focus:outline-none"
                 />
                 <span
-                  className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                  className={`text-[18px] px-3.5 py-1 rounded-xl font-bold ${
                     selectedCoordinators.length === requiredCoordinators
-                      ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                      : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                      ? "bg-green-500/20 text-green-300 border border-green-500/50"
+                      : "bg-amber-500/20 text-amber-300 border border-amber-500/50"
                   }`}
                 >
-                  {selectedCoordinators.length} of {requiredCoordinators} Assigned
+                  {selectedCoordinators.length} of {requiredCoordinators} Selected
                 </span>
               </div>
             </div>
 
-            {/* Coordinator Search Input */}
+            {/* Coordinator Search */}
             <input
               type="text"
               placeholder="Search coordinator by name, domain, or class..."
               value={coordSearch}
               onChange={(e) => setCoordSearch(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-csi-dark border border-csi-border text-xs text-white focus:outline-none focus:border-csi-purple placeholder:text-csi-textDim"
+              className="w-full px-4 py-3 rounded-xl bg-black border border-purple-500/50 text-[18px] text-white focus:outline-none focus:border-purple-400 placeholder:text-slate-500 font-medium"
             />
 
-            {/* Members Selector Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-56 overflow-y-auto p-1 border border-csi-border/60 rounded-xl bg-csi-dark/40">
+            {/* 23 Member Grid with 18px fonts */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 max-h-72 overflow-y-auto p-2 border border-purple-500/30 rounded-xl bg-black/60">
               {sortedMembers.map((member) => {
                 const isSelected = selectedCoordinators.includes(member.name);
                 const isFairChoice = member.events_coordinated_count <= 1;
@@ -306,62 +372,69 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }: Cr
                   <div
                     key={member.id}
                     onClick={() => toggleCoordinator(member.name)}
-                    className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all flex items-start justify-between ${
+                    className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex items-start justify-between ${
                       isSelected
-                        ? "bg-csi-purple/20 border-csi-purple text-white shadow-md shadow-csi-purple/20"
-                        : "bg-csi-surface border-csi-border hover:border-csi-purple/50 text-csi-textMuted hover:text-white"
+                        ? "bg-purple-900/40 border-purple-400 text-white shadow-lg shadow-purple-600/30"
+                        : "bg-[#181622] border-slate-700 hover:border-purple-500/50 text-slate-200 hover:text-white"
                     }`}
                   >
-                    <div className="space-y-0.5 flex-1 pr-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-semibold text-white">{member.name}</span>
+                    <div className="space-y-1 flex-1 pr-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[18px] font-bold text-white">{member.name}</span>
                         {isFairChoice && (
-                          <span className="text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded font-medium">
+                          <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-md font-bold border border-emerald-500/40">
                             Light Workload
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-csi-textDim">{member.role} • {member.class_batch}</p>
-                      <div className="flex items-center gap-1 pt-0.5">
-                        <span className="text-[10px] text-csi-purpleLight">{member.domain}</span>
-                        <span className="text-[10px] text-csi-textDim">• {member.events_coordinated_count} past event(s)</span>
+                      <p className="text-sm text-slate-300">{member.role} • {member.class_batch}</p>
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-xs text-purple-300 font-bold px-2 py-0.5 bg-purple-950 rounded">
+                          {member.domain}
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">
+                          {member.events_coordinated_count} past event(s)
+                        </span>
                       </div>
                     </div>
+
                     <div
-                      className={`w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5 border ${
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border ${
                         isSelected
-                          ? "bg-csi-purple border-csi-purple text-white"
-                          : "border-csi-border text-transparent"
+                          ? "bg-purple-600 border-purple-400 text-white"
+                          : "border-slate-600 text-transparent"
                       }`}
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="w-4 h-4" />
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
 
-          {/* Modal Actions */}
-          <div className="pt-4 border-t border-csi-border flex items-center justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-lg bg-csi-surfaceLight hover:bg-csi-border text-xs font-semibold text-csi-text transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-semibold shadow-lg shadow-purple-600/30 transition flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Create Event &amp; Open Container</span>
-            </button>
+            {/* Step 2 Actions */}
+            <div className="pt-5 border-t border-purple-500/20 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-[18px] font-bold text-slate-200 transition flex items-center gap-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span>Back to Event Details</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleFinalSubmit}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[18px] font-bold shadow-lg shadow-purple-600/30 transition flex items-center gap-2"
+              >
+                <Sparkles className="w-5 h-5" />
+                <span>Create Event &amp; Open Container</span>
+              </button>
+            </div>
           </div>
-        </form>
+        )}
       </div>
     </div>
   );
 }
-

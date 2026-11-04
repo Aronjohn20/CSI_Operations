@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, Calendar, Plus, ExternalLink, ArrowRight } from "lucide-react";
+import { Search, Calendar, Plus, ArrowRight, MapPin, Users } from "lucide-react";
 import { CSIEvent } from "@/lib/types";
 import { getStoredEvents } from "@/lib/eventsStorage";
 import CreateEventModal from "@/components/CreateEventModal";
 
 const statusStyles: Record<string, { text: string; class: string }> = {
-  planned: { text: "Planned", class: "bg-amber-500/20 text-amber-400 border border-amber-500/30" },
-  confirmed: { text: "Confirmed", class: "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" },
-  completed: { text: "Completed", class: "bg-green-500/20 text-green-400 border border-green-500/30" },
+  planned: { text: "Planned", class: "bg-amber-500/20 text-amber-300 border border-amber-500/40" },
+  confirmed: { text: "Confirmed", class: "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40" },
+  completed: { text: "Completed", class: "bg-green-500/20 text-green-300 border border-green-500/40" },
 };
 
 export default function EventsPage() {
@@ -37,35 +37,104 @@ export default function EventsPage() {
     (a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime()
   );
 
+  const testEvent = sorted[0] || null;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-7 max-w-7xl mx-auto">
+      {/* Header with Prominent Create Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-csi-border pb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Events Archive &amp; Schedule</h1>
-          <p className="text-xs text-csi-textDim mt-1">
-            Manage upcoming calendar, required coordinators, and launch dedicated document containers.
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Events Management &amp; Containers</h1>
+          <p className="text-slate-300 text-[18px] mt-1">
+            Dedicated workspace for creating events, allocating coordinators, and managing auto-generated document containers.
           </p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-medium px-4 py-2 rounded-lg text-xs transition shadow-lg shadow-purple-600/25 flex items-center gap-1.5 self-start sm:self-auto"
+          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold px-5 py-3 rounded-xl text-[18px] transition shadow-lg shadow-purple-600/30 flex items-center gap-2 self-start sm:self-auto"
         >
-          <Plus className="w-4 h-4" />
-          <span>+ Add New Event</span>
+          <Plus className="w-5 h-5" />
+          <span>+ Create New Event</span>
         </button>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-csi-textDim" />
+      {/* ACTIVE TEST CONTAINER (SANDBOX) */}
+      {testEvent && (
+        <div className="bg-gradient-to-b from-[#181324] to-[#120F1C] rounded-2xl border border-purple-500/40 p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/20 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-ping"></span>
+              <span className="text-xs font-bold text-purple-200 uppercase tracking-widest bg-purple-950/80 border border-purple-500/40 px-3 py-1 rounded-full">
+                Active Test Container (Sandbox)
+              </span>
+            </div>
+            <Link
+              href={`/events/${testEvent.id}`}
+              className="text-[17px] font-bold text-purple-300 hover:text-white flex items-center gap-1.5 underline"
+            >
+              <span>Open Full Container View</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-xl font-bold text-white">{testEvent.event_name}</h2>
+                <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-green-500/20 text-green-300 border border-green-500/40">
+                  {testEvent.mode}
+                </span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                  {testEvent.status}
+                </span>
+              </div>
+              <p className="text-[17px] text-slate-300 leading-relaxed">
+                {testEvent.brief_description || "Event container ready with pre-filled permission letters, notices, and coordinator rosters."}
+              </p>
+              <div className="flex items-center gap-4 text-[17px] text-slate-200 pt-1.5 font-mono flex-wrap">
+                <span className="flex items-center gap-1.5 text-slate-300">
+                  <Calendar className="w-4 h-4 text-purple-400" />
+                  {testEvent.event_date}
+                </span>
+                <span className="flex items-center gap-1.5 text-slate-300">
+                  <MapPin className="w-4 h-4 text-cyan-400" />
+                  {testEvent.venue}
+                </span>
+                <span className="flex items-center gap-1.5 text-slate-300">
+                  <Users className="w-4 h-4 text-emerald-400" />
+                  {testEvent.assigned_coordinators.length} Coordinators Assigned
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-black/70 rounded-xl border border-purple-500/30 p-4 space-y-2 flex flex-col justify-center">
+              <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">Assigned Coordinators</span>
+              <div className="flex flex-wrap gap-1.5">
+                {testEvent.assigned_coordinators.length > 0 ? (
+                  testEvent.assigned_coordinators.map((name) => (
+                    <span key={name} className="px-2.5 py-1 rounded-md bg-purple-900/40 border border-purple-500/40 text-xs text-purple-200 font-bold">
+                      {name}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-500 italic">None Assigned</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Controls & Filter */}
+      <div className="flex flex-col sm:flex-row gap-3.5 items-start sm:items-center justify-between">
+        <div className="relative w-full sm:w-88">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
             type="text"
             placeholder="Search events by title..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-lg bg-csi-surface border border-csi-border text-xs text-white focus:outline-none focus:border-csi-purple placeholder:text-csi-textDim"
+            className="w-full pl-12 pr-4 py-2.5 rounded-xl bg-black border border-purple-500/40 text-[18px] text-white focus:outline-none focus:border-purple-400 placeholder:text-slate-500 font-medium"
           />
         </div>
 
@@ -73,85 +142,90 @@ export default function EventsPage() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-csi-surface border border-csi-border text-xs text-csi-text focus:outline-none focus:border-csi-purple"
+            className="px-4 py-2.5 rounded-xl bg-black border border-purple-500/40 text-[18px] text-white focus:outline-none focus:border-purple-400 font-medium"
           >
             <option value="all">All Statuses</option>
             <option value="planned">Planned</option>
             <option value="confirmed">Confirmed</option>
             <option value="completed">Completed</option>
           </select>
-          <span className="text-xs text-csi-textDim font-mono">
-            {sorted.length} events
+          <span className="text-[18px] text-slate-300 font-mono font-semibold">
+            {sorted.length} events total
           </span>
         </div>
       </div>
 
-      {/* Events Table */}
-      <div className="bg-csi-surface rounded-xl border border-csi-border shadow-sm overflow-hidden">
+      {/* All Event Containers List */}
+      <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 shadow-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-purple-500/30 flex items-center justify-between bg-[#0B0912]">
+          <h2 className="text-lg font-bold text-white">Event Containers Directory</h2>
+          <span className="text-xs text-slate-400">Click any container to view generated letters &amp; notices</span>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
+          <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-csi-border text-csi-textDim bg-csi-sidebar/60">
-                <th className="py-3.5 px-4 font-semibold text-white">Event Name</th>
-                <th className="py-3.5 px-4 font-semibold text-white">Date</th>
-                <th className="py-3.5 px-4 font-semibold text-white">Status</th>
-                <th className="py-3.5 px-4 font-semibold text-white">Allocation</th>
-                <th className="py-3.5 px-4 font-semibold text-white">Assigned Coordinators</th>
-                <th className="py-3.5 px-4 font-semibold text-white text-right">Container</th>
+              <tr className="border-b border-purple-500/30 text-slate-300 bg-csi-sidebar/70 text-[18px] font-bold">
+                <th className="py-3.5 px-5 text-white">EVENT NAME</th>
+                <th className="py-3.5 px-5 text-white">DATE</th>
+                <th className="py-3.5 px-5 text-white">STATUS</th>
+                <th className="py-3.5 px-5 text-white">ALLOCATION</th>
+                <th className="py-3.5 px-5 text-white">ASSIGNED COORDINATORS</th>
+                <th className="py-3.5 px-5 text-white text-right">ACTIONS</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-csi-border/50">
+            <tbody className="divide-y divide-purple-500/20 text-[18px]">
               {sorted.map((event) => {
                 const statusInfo = statusStyles[event.status] || { text: event.status, class: "bg-slate-700 text-white" };
                 const isFull = event.assigned_coordinators.length >= event.required_coordinators;
 
                 return (
-                  <tr key={event.id} className="hover:bg-csi-surfaceLight/50 transition">
-                    <td className="py-3.5 px-4 font-medium text-white">
-                      <Link href={`/events/${event.id}`} className="hover:text-csi-purpleLight">
+                  <tr key={event.id} className="hover:bg-purple-950/20 transition">
+                    <td className="py-3.5 px-5 font-bold text-white text-[19px]">
+                      <Link href={`/events/${event.id}`} className="hover:text-purple-300">
                         {event.event_name}
                       </Link>
                     </td>
-                    <td className="py-3.5 px-4 text-csi-textMuted font-mono">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-csi-textDim" />
+                    <td className="py-3.5 px-5 text-slate-300 font-mono text-[17px]">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-purple-400" />
                         <span>{event.event_date}</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusInfo.class}`}>
+                    <td className="py-3.5 px-5">
+                      <span className={`text-xs px-3 py-1 rounded-full font-bold ${statusInfo.class}`}>
                         {statusInfo.text}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-csi-textMuted font-mono">
-                      <span className={isFull ? "text-green-400 font-semibold" : "text-amber-400 font-semibold"}>
+                    <td className="py-3.5 px-5 font-mono">
+                      <span className={isFull ? "text-green-400 font-extrabold" : "text-amber-400 font-extrabold"}>
                         {event.assigned_coordinators.length}
                       </span>
-                      <span className="text-csi-textDim"> / {event.required_coordinators} required</span>
+                      <span className="text-slate-400 text-sm"> / {event.required_coordinators}</span>
                     </td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-5">
                       {event.assigned_coordinators.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {event.assigned_coordinators.map((name) => (
                             <span
                               key={name}
-                              className="px-2 py-0.5 rounded bg-csi-dark border border-csi-border text-[11px] text-csi-text"
+                              className="px-2 py-0.5 rounded-md bg-black border border-purple-500/40 text-xs text-slate-200 font-medium"
                             >
                               {name}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-csi-textDim italic">None Assigned</span>
+                        <span className="text-slate-500 italic text-sm">None Assigned</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3.5 px-5 text-right">
                       <Link
                         href={`/events/${event.id}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-csi-purple/20 hover:bg-csi-purple/30 text-csi-purpleLight text-[11px] font-semibold transition"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 hover:text-white border border-purple-500/40 text-sm font-bold transition shadow-sm"
                       >
-                        <span>Open</span>
-                        <ArrowRight className="w-3 h-3" />
+                        <span>Open Container</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </Link>
                     </td>
                   </tr>
@@ -162,7 +236,7 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Create Event Modal */}
       <CreateEventModal
         isOpen={isModalOpen}
         onClose={() => {

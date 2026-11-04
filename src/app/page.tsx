@@ -2,15 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Users, Calendar, CheckCircle2, ArrowRight, Activity, Sparkles } from "lucide-react";
+import { Users, Calendar, CheckCircle2, ArrowRight, Activity } from "lucide-react";
 import { CSIEvent, Member } from "@/lib/types";
 import { getStoredEvents, getStoredMembers } from "@/lib/eventsStorage";
-import CreateEventModal from "@/components/CreateEventModal";
 
 export default function Home() {
   const [events, setEvents] = useState<CSIEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     setEvents(getStoredEvents());
@@ -34,7 +32,7 @@ export default function Home() {
       icon: Users,
     },
     {
-      label: "SCHEDULED EVENTS",
+      label: "TOTAL EVENTS",
       value: totalEvents,
       sub: "Active term calendar",
       borderColor: "border-t-purple-500",
@@ -43,219 +41,164 @@ export default function Home() {
     {
       label: "COMPLETED EVENTS",
       value: completedEvents,
-      sub: `${activeEvents} still active`,
+      sub: `${activeEvents} upcoming / active`,
       borderColor: "border-t-cyan-500",
       icon: CheckCircle2,
     },
     {
       label: "PLATFORM STATUS",
-      value: "Ready",
-      sub: "CSI Core Engine Online",
+      value: "Online",
+      sub: "CSI Branch Operational",
       borderColor: "border-t-pink-500",
       icon: Activity,
     },
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between border-b border-csi-border pb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Overview Dashboard</h1>
-          <p className="text-xs text-csi-textDim mt-0.5">CSI Student Chapter Operations &amp; Event Automation Platform</p>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Overview Dashboard</h1>
+          <p className="text-slate-300 text-lg mt-1">High-level executive overview of CSI chapter operations</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-medium px-4 py-2 rounded-lg text-xs transition shadow-lg shadow-purple-600/25 flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Add New Event</span>
-          </button>
+        <div className="flex items-center space-x-2.5 bg-[#12101C] px-4 py-2 rounded-full border border-purple-500/30">
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+          <span className="text-sm text-slate-200 font-bold">All Systems Operational</span>
         </div>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.label}
-              className={`bg-csi-surface rounded-xl border border-csi-border border-t-2 ${card.borderColor} p-5 shadow-sm`}
+              className={`bg-[#12101C] rounded-2xl border-2 border-purple-500/30 border-t-4 ${card.borderColor} p-6 shadow-xl`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-semibold text-csi-textDim uppercase tracking-wider">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                   {card.label}
                 </span>
-                <Icon className="w-4 h-4 text-csi-textDim" />
+                <Icon className="w-5 h-5 text-slate-400" />
               </div>
-              <p className="text-3xl font-bold text-white mb-1">{card.value}</p>
-              <p className="text-xs text-csi-textMuted">{card.sub}</p>
+              <p className="text-4xl font-extrabold text-white mb-1.5">{card.value}</p>
+              <p className="text-sm text-slate-300 font-medium">{card.sub}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Events Table */}
-        <div className="lg:col-span-2 bg-csi-surface rounded-xl border border-csi-border overflow-hidden shadow-sm">
-          <div className="px-6 py-4 border-b border-csi-border flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-white">Upcoming &amp; Recent Club Events</h2>
-              <p className="text-xs text-csi-textDim">Click any event to open its complete auto-generation container</p>
-            </div>
-            <Link href="/events" className="text-xs text-csi-purpleLight hover:underline font-medium">
-              View all ({totalEvents}) →
-            </Link>
+      {/* Recent Activity Table */}
+      <div className="bg-[#12101C] rounded-2xl border-2 border-purple-500/30 overflow-hidden shadow-xl">
+        <div className="px-7 py-5 border-b-2 border-purple-500/30 flex items-center justify-between bg-[#0B0912]">
+          <div>
+            <h2 className="text-xl font-extrabold text-white">Recent Events Activity</h2>
+            <p className="text-sm text-slate-400">Summary of latest CSI events and assigned coordinators</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-csi-border text-csi-textDim bg-csi-sidebar/50">
-                  <th className="py-3 px-4 font-medium">Event Name</th>
-                  <th className="py-3 px-4 font-medium">Date</th>
-                  <th className="py-3 px-4 font-medium">Status</th>
-                  <th className="py-3 px-4 font-medium">Allocation</th>
-                  <th className="py-3 px-4 font-medium">Assigned</th>
-                  <th className="py-3 px-4 font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-csi-border/50">
-                {events.slice(0, 6).map((event) => {
-                  const statusMap: Record<string, { text: string; cls: string }> = {
-                    planned: { text: "Planned", cls: "bg-amber-500/20 text-amber-400 border border-amber-500/30" },
-                    confirmed: { text: "Confirmed", cls: "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" },
-                    completed: { text: "Completed", cls: "bg-green-500/20 text-green-400 border border-green-500/30" },
-                  };
-                  const statusInfo = statusMap[event.status] || { text: event.status, cls: "bg-slate-700 text-white" };
-
-                  return (
-                    <tr
-                      key={event.id}
-                      className="hover:bg-csi-surfaceLight/50 transition cursor-pointer"
-                    >
-                      <td className="py-3 px-4 font-medium text-white">
-                        <Link href={`/events/${event.id}`} className="hover:text-csi-purpleLight">
-                          {event.event_name}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-4 text-csi-textMuted font-mono">
-                        {event.event_date}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusInfo.cls}`}>
-                          {statusInfo.text}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-csi-textMuted font-mono">
-                        {event.required_coordinators} required
-                      </td>
-                      <td className="py-3 px-4 text-csi-textMuted max-w-[180px] truncate">
-                        {event.assigned_coordinators.length > 0 ? (
-                          event.assigned_coordinators.join(", ")
-                        ) : (
-                          <span className="text-csi-textDim italic">None Assigned</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Link
-                          href={`/events/${event.id}`}
-                          className="px-2 py-1 rounded bg-csi-dark border border-csi-border text-[10px] text-csi-purpleLight hover:bg-csi-purple hover:text-white transition"
-                        >
-                          Open Container →
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Link
+            href="/events"
+            className="text-base text-purple-300 hover:text-white underline font-bold flex items-center gap-1.5"
+          >
+            <span>Go to Events Manager</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b-2 border-purple-500/30 text-slate-300 bg-csi-sidebar/50 text-[20px] font-bold">
+                <th className="py-4 px-6">EVENT NAME</th>
+                <th className="py-4 px-6">DATE</th>
+                <th className="py-4 px-6">STATUS</th>
+                <th className="py-4 px-6">ASSIGNED COORDINATORS</th>
+                <th className="py-4 px-6 text-right">VIEW</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-purple-500/20 text-[18px]">
+              {events.slice(0, 6).map((event) => {
+                const statusMap: Record<string, { text: string; cls: string }> = {
+                  planned: { text: "Planned", cls: "bg-amber-500/20 text-amber-300 border border-amber-500/40" },
+                  confirmed: { text: "Confirmed", cls: "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40" },
+                  completed: { text: "Completed", cls: "bg-green-500/20 text-green-300 border border-green-500/40" },
+                };
+                const statusInfo = statusMap[event.status] || { text: event.status, cls: "bg-slate-700 text-white" };
 
-        {/* Quick Operational Actions Card */}
-        <div className="bg-csi-surface rounded-xl border border-csi-border p-6 space-y-4 shadow-sm flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-csi-purpleLight" />
-              <h2 className="font-semibold text-white">Quick Operational Hub</h2>
-            </div>
-            <p className="text-xs text-csi-textDim leading-relaxed">
-              Create an event to automatically generate RSMS notices, permission letters, feedback QR codes, and coordinator allocations in 1 click.
-            </p>
-
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="w-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-medium py-3 rounded-lg transition shadow-lg shadow-purple-600/20 flex items-center justify-center space-x-2 text-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Launch Event Creation Wizard</span>
-            </button>
-          </div>
-
-          <div className="p-3.5 rounded-lg bg-csi-dark border border-csi-border space-y-1.5 text-xs">
-            <span className="text-[10px] font-bold text-csi-purpleLight uppercase tracking-wider">CSI Rule Engine</span>
-            <p className="text-csi-textDim text-[11px]">
-              Coordinators are fairly distributed based on the 23-member workload counter.
-            </p>
-          </div>
+                return (
+                  <tr key={event.id} className="hover:bg-purple-950/20 transition">
+                    <td className="py-4 px-6 font-bold text-white text-[18px]">
+                      {event.event_name}
+                    </td>
+                    <td className="py-4 px-6 text-slate-300 font-mono text-[17px]">
+                      {event.event_date}
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={`text-sm px-3.5 py-1 rounded-full font-bold ${statusInfo.cls}`}>
+                        {statusInfo.text}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-slate-200">
+                      {event.assigned_coordinators.length > 0 ? (
+                        event.assigned_coordinators.join(", ")
+                      ) : (
+                        <span className="text-slate-500 italic text-base">None Assigned</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <Link
+                        href={`/events/${event.id}`}
+                        className="text-base text-purple-300 hover:text-white font-extrabold underline"
+                      >
+                        Container →
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
       {/* Navigation Quick Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link
-          href="/members"
-          className="group p-6 bg-csi-surface rounded-xl border border-csi-border hover:border-csi-purple/50 hover:shadow-lg hover:shadow-csi-purple/10 transition"
+          href="/events"
+          className="group p-7 bg-[#12101C] rounded-2xl border-2 border-purple-500/30 hover:border-purple-400 hover:shadow-xl hover:shadow-purple-600/20 transition"
         >
           <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center mb-4">
-              <Users className="w-6 h-6" />
+            <div className="w-14 h-14 rounded-2xl bg-purple-500/20 text-purple-300 flex items-center justify-center mb-4">
+              <Calendar className="w-7 h-7" />
             </div>
-            <ArrowRight className="w-5 h-5 text-csi-textDim group-hover:text-purple-400 group-hover:translate-x-1 transition" />
+            <ArrowRight className="w-6 h-6 text-slate-400 group-hover:text-purple-300 group-hover:translate-x-1 transition" />
           </div>
-          <h2 className="text-lg font-semibold text-white group-hover:text-purple-400 transition">
-            Members Database &amp; Workload
+          <h2 className="text-2xl font-extrabold text-white group-hover:text-purple-300 transition">
+            Events Hub &amp; Creation
           </h2>
-          <p className="text-sm text-csi-textDim mt-1">
-            Manage {totalMembers} members, track availability (Free/Busy), and monitor coordinator workload.
+          <p className="text-[19px] text-slate-300 mt-1.5 leading-relaxed">
+            Create new events, allocate coordinators, and launch 4-in-1 auto-generation containers.
           </p>
         </Link>
 
         <Link
-          href="/events"
-          className="group p-6 bg-csi-surface rounded-xl border border-csi-border hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10 transition"
+          href="/members"
+          className="group p-7 bg-[#12101C] rounded-2xl border-2 border-purple-500/30 hover:border-cyan-400 hover:shadow-xl hover:shadow-cyan-500/20 transition"
         >
           <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-4">
-              <Calendar className="w-6 h-6" />
+            <div className="w-14 h-14 rounded-2xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center mb-4">
+              <Users className="w-7 h-7" />
             </div>
-            <ArrowRight className="w-5 h-5 text-csi-textDim group-hover:text-cyan-400 group-hover:translate-x-1 transition" />
+            <ArrowRight className="w-6 h-6 text-slate-400 group-hover:text-cyan-300 group-hover:translate-x-1 transition" />
           </div>
-          <h2 className="text-lg font-semibold text-white group-hover:text-cyan-400 transition">
-            Events Hosted Archive
+          <h2 className="text-2xl font-extrabold text-white group-hover:text-cyan-300 transition">
+            Members Database &amp; Workload
           </h2>
-          <p className="text-sm text-csi-textDim mt-1">
-            {completedEvents} completed events archived with coordinator assignments and records.
+          <p className="text-[19px] text-slate-300 mt-1.5 leading-relaxed">
+            Manage 23 members, track availability, and inspect coordination counts.
           </p>
         </Link>
       </div>
-
-      {/* Modal */}
-      <CreateEventModal
-        isOpen={isCreateModalOpen}
-        onClose={() => {
-          setIsCreateModalOpen(false);
-          setEvents(getStoredEvents());
-          setMembers(getStoredMembers());
-        }}
-        onEventCreated={() => {
-          setEvents(getStoredEvents());
-          setMembers(getStoredMembers());
-        }}
-      />
     </div>
   );
 }

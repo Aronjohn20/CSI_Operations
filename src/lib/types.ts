@@ -1,3 +1,17 @@
+export const BRANCHES = [
+  "AEI",
+  "CSE",
+  "CSBS",
+  "IT",
+  "AD",
+  "ME",
+  "CE",
+  "EEE",
+  "ECE",
+] as const;
+
+export type Branch = typeof BRANCHES[number];
+
 export type MemberType = "old_coordinator" | "new_coordinator";
 
 export interface Member {
@@ -15,11 +29,11 @@ export interface CSIEvent {
   id: string;
   event_name: string;
   event_date: string; // ISO date string e.g. "2026-11-15"
-  time_start?: string; // e.g. "10:00 AM"
-  time_end?: string; // e.g. "01:00 PM"
+  time_start?: string; // e.g. "01:30 PM"
+  time_end?: string; // e.g. "04:30 PM"
   mode: "Offline" | "Online";
   venue: string;
-  target_class: string;
+  target_branches: string[]; // 9 branches: AEI, CSE, CSBS, IT, AD, ME, CE, EEE, ECE
   faculty_in_charge: string;
   brief_description: string;
   status: "planned" | "confirmed" | "completed";
