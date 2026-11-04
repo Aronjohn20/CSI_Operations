@@ -2,58 +2,60 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Users, Layers, Shield } from "lucide-react";
+import { LayoutDashboard, Users, Calendar } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
 
   const navItems = [
-    { name: "Dashboard", href: "/", icon: Layers },
-    { name: "Events Archive", href: "/events", icon: Calendar },
-    { name: "Members Database", href: "/members", icon: Users },
+    { name: "Overview", href: "/", icon: LayoutDashboard },
+    { name: "Events", href: "/events", icon: Calendar },
+    { name: "Members", href: "/members", icon: Users },
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-slate-900 border-b border-slate-800 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Brand Logo & Title */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-700 flex items-center justify-center font-bold text-lg text-white shadow-inner">
-              CSI
-            </div>
-            <div>
-              <Link href="/" className="font-bold text-lg tracking-tight hover:text-blue-300 transition">
-                CSI Operations
-              </Link>
-              <p className="text-xs text-slate-400">Student Chapter Platform</p>
-            </div>
+    <aside className="fixed top-0 left-0 h-screen w-56 bg-csi-sidebar border-r border-csi-border flex flex-col z-50">
+      {/* Brand */}
+      <div className="px-5 py-6 border-b border-csi-border">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-lg bg-csi-purple flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-csi-purple/30">
+            CSI
           </div>
-
-          {/* Nav Links */}
-          <nav className="flex items-center space-x-1 sm:space-x-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition ${
-                    isActive
-                      ? "bg-blue-800 text-white shadow-sm"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          <div>
+            <Link href="/" className="font-bold text-base text-white hover:text-csi-purpleLight transition">
+              CSI Operations
+            </Link>
+            <p className="text-[10px] text-csi-textDim uppercase tracking-wider">Student Branch Platform</p>
+          </div>
         </div>
       </div>
-    </header>
+
+      {/* Nav Links */}
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                isActive
+                  ? "bg-csi-purple text-white shadow-lg shadow-csi-purple/25"
+                  : "text-csi-textMuted hover:bg-csi-surfaceLight hover:text-white"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{item.name}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-5 py-4 border-t border-csi-border">
+        <p className="text-[10px] text-csi-textDim">CSI Operations v1.0</p>
+      </div>
+    </aside>
   );
 }
-

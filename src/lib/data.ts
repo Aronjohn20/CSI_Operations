@@ -1,0 +1,43 @@
+import { Member, CSIEvent } from "./types";
+
+export const members: Member[] = [
+  { id: "1", name: "Gayathri Binoj", role: "President", domain: "Executive", class_batch: "S7 CS B", member_type: "old_coordinator", is_active: true, events_coordinated_count: 1 },
+  { id: "2", name: "Abhishek Joby", role: "Vice President", domain: "Executive", class_batch: "S7 CS A", member_type: "old_coordinator", is_active: true, events_coordinated_count: 1 },
+  { id: "3", name: "Ayyappadas S", role: "Secretary", domain: "Executive", class_batch: "S7 CS A", member_type: "old_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "4", name: "Fathima Naja", role: "Joint Secretary", domain: "Executive", class_batch: "S7 CSBS", member_type: "old_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "5", name: "Suraj S Panickar", role: "Treasurer", domain: "Executive", class_batch: "S7 CS C", member_type: "old_coordinator", is_active: true, events_coordinated_count: 0 },
+  { id: "6", name: "Vishnu M P", role: "Executive Coordinator", domain: "Executive", class_batch: "S7 CSBS", member_type: "old_coordinator", is_active: true, events_coordinated_count: 1 },
+  { id: "7", name: "Aron Varghese John", role: "Operations Lead", domain: "Operations", class_batch: "S7 CS A", member_type: "old_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "8", name: "Sneha Phinoo", role: "Operations Co-Lead", domain: "Operations", class_batch: "S5 CS D", member_type: "old_coordinator", is_active: true, events_coordinated_count: 1 },
+  { id: "9", name: "Sreya Raj", role: "Creative Lead", domain: "Creative", class_batch: "S7 IT", member_type: "old_coordinator", is_active: true, events_coordinated_count: 0 },
+  { id: "10", name: "Kripa Ann John", role: "Creative Co-Lead", domain: "Creative", class_batch: "S5 CS C", member_type: "old_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "11", name: "Aafiya Shameer", role: "Documentation Lead", domain: "Documentation", class_batch: "S7 CS A", member_type: "old_coordinator", is_active: true, events_coordinated_count: 3 },
+  { id: "12", name: "June Maria Sudhil", role: "Documentation Co-Lead", domain: "Documentation", class_batch: "S5 AD", member_type: "new_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "13", name: "Alina Mary John", role: "Marketing Lead", domain: "Marketing", class_batch: "S7 IT", member_type: "old_coordinator", is_active: true, events_coordinated_count: 1 },
+  { id: "14", name: "Ben George Simon", role: "Marketing Co-Lead", domain: "Marketing", class_batch: "S3 IT", member_type: "new_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "15", name: "Soorya Das K S", role: "Technical Lead", domain: "Technical", class_batch: "S5 IT", member_type: "old_coordinator", is_active: true, events_coordinated_count: 3 },
+  { id: "16", name: "Riyan Raz", role: "Technical Co-Lead", domain: "Technical", class_batch: "S5 CS D", member_type: "new_coordinator", is_active: true, events_coordinated_count: 1 },
+  { id: "17", name: "Anjali Shaju", role: "Sub-Core (Documentation)", domain: "Documentation", class_batch: "S3 CS A", member_type: "new_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "18", name: "Vaishnavi Dev Thekke Veedu", role: "Sub-Core (Creative)", domain: "Creative", class_batch: "S3 CS D", member_type: "new_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "19", name: "Jovit Jerry", role: "Sub-Core (Creative)", domain: "Creative", class_batch: "S5 CSBS", member_type: "new_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "20", name: "Lanet Varghese", role: "Sub-Core (Operations)", domain: "Operations", class_batch: "S5 CSBS", member_type: "old_coordinator", is_active: true, events_coordinated_count: 0 },
+  { id: "21", name: "Elizabeth Joby", role: "Sub-Core (Operations)", domain: "Operations", class_batch: "S3 AD", member_type: "new_coordinator", is_active: true, events_coordinated_count: 2 },
+  { id: "22", name: "Avanthika S", role: "Sub-Core (Marketing)", domain: "Marketing", class_batch: "S3 AD", member_type: "new_coordinator", is_active: true, events_coordinated_count: 1 },
+  { id: "23", name: "Krishna Priya K R", role: "Sub-Core (Creative)", domain: "Creative", class_batch: "S3 AD", member_type: "new_coordinator", is_active: true, events_coordinated_count: 1 },
+];
+
+export const events: CSIEvent[] = [
+  { id: "e1", event_name: "Cache Quest + Magazine launch", event_date: "2026-07-10", status: "completed", required_coordinators: 3, assigned_coordinators: ["Aafiya Shameer", "Fathima Naja", "June Maria Sudhil"] },
+  { id: "e2", event_name: "Coder of the Month - July", event_date: "2026-07-16", status: "completed", required_coordinators: 2, assigned_coordinators: ["Jovit Jerry", "Vaishnavi Dev Thekke Veedu"] },
+  { id: "e3", event_name: "Tech-Jeopardy", event_date: "2026-08-14", status: "completed", required_coordinators: 2, assigned_coordinators: [] },
+  { id: "e4", event_name: "Bug Se Azadi", event_date: "2026-08-16", status: "completed", required_coordinators: 2, assigned_coordinators: ["Anjali Shaju", "Elizabeth Joby"] },
+  { id: "e5", event_name: "Build & Ship AI product", event_date: "2026-09-01", status: "completed", required_coordinators: 3, assigned_coordinators: ["Soorya Das K S", "Aron Varghese John", "Aafiya Shameer"] },
+  { id: "e6", event_name: "Traceback", event_date: "2026-09-15", status: "completed", required_coordinators: 2, assigned_coordinators: ["Soorya Das K S", "Ben George Simon"] },
+  { id: "e7", event_name: "Retro Rumble", event_date: "2026-09-16", status: "completed", required_coordinators: 2, assigned_coordinators: ["Ayyappadas S", "Fathima Naja"] },
+  { id: "e8", event_name: "Real or Cake", event_date: "2026-09-17", status: "completed", required_coordinators: 3, assigned_coordinators: ["Soorya Das K S", "June Maria Sudhil", "Kripa Ann John"] },
+  { id: "e9", event_name: "Say Cheese", event_date: "2026-09-18", status: "completed", required_coordinators: 4, assigned_coordinators: ["Alina Mary John", "Elizabeth Joby", "Avanthika S", "Vishnu M P"] },
+  { id: "e10", event_name: "Coder of the Month - September", event_date: "2026-09-19", status: "completed", required_coordinators: 2, assigned_coordinators: ["Aron Varghese John", "Aafiya Shameer"] },
+  { id: "e11", event_name: "Keeping it Reel", event_date: "2026-09-21", status: "completed", required_coordinators: 2, assigned_coordinators: ["Anjali Shaju", "Kripa Ann John"] },
+  { id: "e12", event_name: "History But Wrong", event_date: "2026-09-23", status: "completed", required_coordinators: 4, assigned_coordinators: ["Abhishek Joby", "Vaishnavi Dev Thekke Veedu", "Riyan Raz", "Krishna Priya K R"] },
+  { id: "e13", event_name: "Off the Script", event_date: "2026-09-25", status: "completed", required_coordinators: 5, assigned_coordinators: ["Ayyappadas S", "Ben George Simon", "Jovit Jerry", "Sneha Phinoo", "Gayathri Binoj"] },
+];
