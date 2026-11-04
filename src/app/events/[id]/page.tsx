@@ -24,10 +24,16 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
+  FileCode,
 } from "lucide-react";
 import { CSIEvent, RegisteredAttendee } from "@/lib/types";
 import { members } from "@/lib/data";
 import { getStoredEvents, deleteEvent, updateEvent } from "@/lib/eventsStorage";
+import {
+  generateEventGoogleAppsScript,
+  getDepartmentChoices,
+  mapGoogleFormResponsesToAttendance,
+} from "@/lib/formScriptGenerator";
 import {
   exportRsmsPdf,
   exportRsmsWord,
@@ -61,11 +67,24 @@ export default function EventContainerPage() {
     }
   };
 
+  // Google Apps Script Modal State
+  const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
+  const [scriptCopied, setScriptCopied] = useState(false);
+
   // Google Sheet / Registrations Sync State
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [sheetInput, setSheetInput] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
+
+  const eventScriptCode = event ? generateEventGoogleAppsScript(event) : "";
+  const eventDepartments = event ? getDepartmentChoices(event.target_branches) : [];
+
+  const handleCopyScript = () => {
+    navigator.clipboard.writeText(eventScriptCode);
+    setScriptCopied(true);
+    setTimeout(() => setScriptCopied(false), 2500);
+  };
 
   const sampleAttendees: RegisteredAttendee[] = [
     { sl_no: 1, name: "LEYAH MARY THOMAS", gender: "Female", class_batch: "S7 CS A" },
@@ -124,29 +143,10 @@ export default function EventContainerPage() {
       }
 
       const delimiter = lines[0].includes("\t") ? "\t" : ",";
-      const headers = lines[0].split(delimiter).map((h) => h.replace(/^["']|["']$/g, "").trim().toLowerCase());
+      const headers = lines[0].split(delimiter);
+      const rows = lines.slice(1).map((l) => l.split(delimiter));
 
-      const nameIdx = headers.findIndex((h) => h.includes("name"));
-      const genderIdx = headers.findIndex((h) => h.includes("gender") || h.includes("sex"));
-      const classIdx = headers.findIndex((h) => h.includes("class") || h.includes("batch") || h.includes("branch") || h.includes("dept"));
-
-      if (nameIdx === -1) {
-        throw new Error("Header row must contain a column for 'Name' or 'Full Name'.");
-      }
-
-      const attendees: RegisteredAttendee[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const row = lines[i].split(delimiter).map((c) => c.replace(/^["']|["']$/g, "").trim());
-        const name = row[nameIdx];
-        if (!name) continue;
-
-        attendees.push({
-          sl_no: attendees.length + 1,
-          name: name,
-          gender: genderIdx !== -1 && row[genderIdx] ? row[genderIdx] : "",
-          class_batch: classIdx !== -1 && row[classIdx] ? row[classIdx] : "",
-        });
-      }
+      const attendees = mapGoogleFormResponsesToAttendance(headers, rows);
 
       if (attendees.length === 0) {
         throw new Error("No student names could be extracted.");
@@ -618,37 +618,91 @@ export default function EventContainerPage() {
                 )}
               </div>
               <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                Connect the CSI Google Drive responses Sheet to automatically map attendees directly into the Attendance Sheet.
+                Automate your official Google Form &amp; Responses Sheet inside your CSI Google Drive, then sync responses directly to the Attendance Sheet.
               </p>
-              <div className="bg-black p-4 rounded-xl border border-purple-500/30 space-y-3 text-sm">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Standard College Fields:</span>
-                  <span className="text-white font-mono font-bold">7 Form Questions</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Target Branches:</span>
-                  <span className="text-cyan-300 font-bold font-mono">{branchesString}</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Attendance Sheet Sync:</span>
-                  <span className="text-emerald-400 font-mono font-bold">
-                    {event.registered_attendees?.length ? `${event.registered_attendees.length} Students Mapped` : "Ready to Link"}
+
+              {/* Form Questions Overview matching user screenshots */}
+              <div className="bg-black p-4 rounded-xl border border-purple-500/30 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
+                  <span className="font-bold text-slate-200">Official Form Questions (10 Fields):</span>
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                    All Required except CSI ID
                   </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-slate-300 font-mono text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold">1.</span> Email *
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold">2.</span> Title * (Mr / Ms)
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold">3.</span> Name *
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold">4.</span> Rajagiri Email ID *
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold">5.</span> Contact No.(Preferably WhatsApp) *
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold">6.</span> Year of study * (1st – 4th yr)
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold">7.</span> Division * (Alpha - Nil)
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold">8.</span> Are you a CSI member? *
+                  </div>
+                  <div className="flex items-center gap-1.5 col-span-1 sm:col-span-2">
+                    <span className="text-slate-500">9.</span> If yes, enter CSI membership id (Optional)
+                  </div>
+                </div>
+
+                {/* Dynamic Departments based on event container */}
+                <div className="pt-2 border-t border-purple-500/20 space-y-1.5">
+                  <span className="text-[11px] text-slate-400 font-semibold block">
+                    Dynamic Department Options (injected from event branches):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {eventDepartments.map((dept) => (
+                      <span
+                        key={dept}
+                        className="px-2 py-0.5 rounded-md bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold font-mono text-[11px]"
+                      >
+                        {dept}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
+
             <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between gap-2 flex-wrap">
-              <button
-                onClick={() => setIsSyncModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                <span>Connect Google Sheet / Import</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setIsScriptModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  title="Generate Google Apps Script to run in CSI Drive"
+                >
+                  <FileCode className="w-4 h-4 text-purple-400" />
+                  <span>Get Google Apps Script</span>
+                </button>
+
+                <button
+                  onClick={() => setIsSyncModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  title="Import responses from Google Sheet"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                  <span>Connect Sheet / Import</span>
+                </button>
+              </div>
 
               <button
                 onClick={() => copyToClipboard(mockRegUrl, "regUrl")}
-                className="text-xs text-purple-300 hover:text-white font-bold underline"
+                className="text-xs text-amber-300 hover:text-white font-bold underline"
               >
                 {copiedSection === "regUrl" ? "Copied Link!" : "Copy Public Link"}
               </button>
@@ -842,6 +896,113 @@ export default function EventContainerPage() {
           </div>
         </div>
       </div>
+
+      {/* GOOGLE APPS SCRIPT GENERATOR MODAL */}
+      {isScriptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#12101C] border border-purple-500/40 w-full max-w-3xl rounded-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5 text-white font-bold text-base">
+                <FileCode className="w-5 h-5 text-purple-400" />
+                <span>Google Apps Script — 1-Click Form &amp; Sheet Generator</span>
+              </div>
+              <button
+                onClick={() => setIsScriptModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-300 overflow-y-auto pr-1">
+              <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 space-y-1.5">
+                <p className="font-bold text-purple-200 text-sm">
+                  Run directly inside your CSI Gmail Drive (script.google.com)
+                </p>
+                <p className="text-slate-300 leading-relaxed">
+                  This custom script builds the exact 10-question registration form in your CSI Drive, injects only the eligible departments (<strong>{eventDepartments.join(", ")}</strong>), creates the responses Google Sheet, and automatically links them together!
+                </p>
+              </div>
+
+              {/* Step by Step Instructions */}
+              <div className="bg-black/60 p-4 rounded-xl border border-white/10 space-y-2">
+                <p className="font-bold text-white uppercase tracking-wider text-[11px]">How to Run in 4 Steps:</p>
+                <ol className="list-decimal list-inside space-y-1 text-slate-300 leading-relaxed">
+                  <li>
+                    Open Google Drive in your CSI Gmail account, then visit{" "}
+                    <a
+                      href="https://script.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 underline font-semibold"
+                    >
+                      script.google.com
+                    </a>{" "}
+                    and click <strong>+ New project</strong>.
+                  </li>
+                  <li>
+                    In the code editor, delete any existing text, paste the script below, and click <strong>Save</strong> (💾).
+                  </li>
+                  <li>
+                    Click <strong>Run</strong>. When prompted for authorization, click <em>Review permissions</em> &gt; <em>Advanced</em> &gt; <em>Go to Untitled project (unsafe)</em> &gt; <em>Allow</em>.
+                  </li>
+                  <li>
+                    Check the <strong>Execution log</strong> at the bottom of the screen: It outputs your <strong>Live Form Link</strong>, <strong>Form Edit Link</strong>, and <strong>Responses Google Sheet Link</strong>.
+                  </li>
+                </ol>
+              </div>
+
+              {/* Code Box */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span className="font-mono text-slate-300">Code.gs (Auto-Tailored for {event.event_name})</span>
+                  <button
+                    onClick={handleCopyScript}
+                    className="px-3 py-1 rounded bg-purple-600/40 hover:bg-purple-600 text-purple-200 hover:text-white font-bold flex items-center gap-1.5 transition"
+                  >
+                    {scriptCopied ? (
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300">Copied to Clipboard!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Script</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <pre className="p-4 rounded-xl bg-black border border-purple-500/30 text-[11px] text-emerald-300 font-mono overflow-x-auto max-h-64 leading-relaxed select-all">
+                  {eventScriptCode}
+                </pre>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-500">
+                Department options: {eventDepartments.join(", ")}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyScript}
+                  className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{scriptCopied ? "Copied!" : "Copy Full Script"}</span>
+                </button>
+                <button
+                  onClick={() => setIsScriptModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GOOGLE SHEET REGISTRATIONS IMPORT MODAL */}
       {isSyncModalOpen && (

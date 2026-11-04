@@ -1,90 +1,89 @@
 /**
  * ============================================================================
- * CSI RSET - Automated Registration Form & Sheet Generator
+ * CSI SB RSET - Automated Google Form & Responses Sheet Generator
  * ============================================================================
  * Instructions:
- * 1. Open Google Drive with your CSI Gmail account (https://drive.google.com).
- * 2. Go to Google Apps Script (https://script.google.com) and click "New Project".
- * 3. Delete any code in the editor, paste this entire file, and click "Save".
- * 4. Update the EVENT_CONFIG object below with your event details.
- * 5. Select "createRegistrationFormAndSheet" in the function dropdown and click "Run".
- * 6. Review permissions (click "Advanced" > "Go to project (unsafe)" > "Allow").
- * 7. Check the Execution Log: It outputs the Form Link and Response Sheet Link!
+ * 1. Open Google Drive in your CSI Gmail account (https://drive.google.com).
+ * 2. Go to Google Apps Script (https://script.google.com) and click "+ New project".
+ * 3. Delete any default code, paste this entire script, and click Save (💾).
+ * 4. Update EVENT_CONFIG below if running for a different event.
+ * 5. Click "Run" (createRegistrationFormAndSheet).
+ *    Grant Google permissions (Click Advanced > Go to project (unsafe) > Allow).
+ * 6. Check the Execution Log: It outputs:
+ *    - Public Form Link (RSMS Notice / Registration Link)
+ *    - Edit Form Link (To add description / banner)
+ *    - Responses Google Sheet Link (To sync with Attendance Sheet)
  * ============================================================================
  */
 
 const EVENT_CONFIG = {
   eventName: "Off the Script",
-  eventDate: "25th September 2026",
-  time: "01:00 PM - 04:30 PM",
-  venue: "Main Auditorium",
-  description: "Annual CSI technical event organized by Computer Society of India Student Branch RSET.",
-  targetBranches: ["AEI", "CSE", "CSBS", "IT", "AD", "ME", "CE", "EEE", "ECE"],
+  // Department options dynamically match the branches selected for the event:
+  // e.g. ["AI&DS", "CSBS", "CSE", "IT"]
+  targetDepartments: ["AI&DS", "CSBS", "CSE", "IT"],
 };
 
 function createRegistrationFormAndSheet() {
-  const formTitle = `${EVENT_CONFIG.eventName} - Registration Form`;
+  const formTitle = `${EVENT_CONFIG.eventName} Registration Form`;
 
-  // 1. Create the Google Form
+  // 1. Create Google Form
   const form = FormApp.create(formTitle);
-  form.setDescription(
-    `Computer Society of India (CSI) Student Branch RSET\n` +
-    `Event: ${EVENT_CONFIG.eventName}\n` +
-    `Date: ${EVENT_CONFIG.eventDate}\n` +
-    `Time: ${EVENT_CONFIG.time}\n` +
-    `Venue: ${EVENT_CONFIG.venue}\n\n` +
-    `${EVENT_CONFIG.description}\n\n` +
-    `Please fill out this form to register for the event.`
-  );
-
   form.setCollectEmail(true);
   form.setAllowResponseEdits(false);
   form.setLimitOneResponsePerUser(true);
 
-  // Standard CSI Registration Questions
-  // Q1: Full Name (Maps directly to Attendance Sheet NAME)
-  form.addTextItem()
-    .setTitle("Full Name")
-    .setHelpText("Enter your full legal name as it should appear in event records.")
-    .setRequired(true);
-
-  // Q2: Gender (Maps directly to Attendance Sheet GENDER)
+  // Q1: Title * (Multiple Choice: Mr, Ms)
   form.addMultipleChoiceItem()
-    .setTitle("Gender")
-    .setChoiceValues(["Male", "Female", "Other"])
+    .setTitle("Title")
+    .setChoiceValues(["Mr", "Ms"])
     .setRequired(true);
 
-  // Q3: Class & Batch (Maps directly to Attendance Sheet CLASS)
+  // Q2: Name * (Short Answer)
   form.addTextItem()
-    .setTitle("Class & Batch")
-    .setHelpText("e.g., S7 CS A, S5 IT, S3 CSBS, S3 AD")
+    .setTitle("Name")
     .setRequired(true);
 
-  // Q4: Branch / Department
-  form.addListItem()
-    .setTitle("Branch / Department")
-    .setChoiceValues(EVENT_CONFIG.targetBranches)
-    .setRequired(true);
-
-  // Q5: College Roll Number / Register Number
+  // Q3: Rajagiri Email ID * (Short Answer)
   form.addTextItem()
-    .setTitle("Roll Number / Register Number")
-    .setHelpText("e.g., RET23CS045")
+    .setTitle("Rajagiri Email ID")
     .setRequired(true);
 
-  // Q6: Phone Number / WhatsApp
+  // Q4: Contact No.(Preferably WhatsApp) * (Short Answer)
   form.addTextItem()
-    .setTitle("WhatsApp Contact Number")
-    .setHelpText("Enter 10-digit mobile number for event coordinator updates.")
+    .setTitle("Contact No.(Preferably WhatsApp)")
     .setRequired(true);
 
-  // Q7: CSI Membership Status
+  // Q5: Year of study * (Multiple Choice: 1st year, 2nd year, 3rd year, 4th year)
   form.addMultipleChoiceItem()
-    .setTitle("Are you a CSI Member?")
+    .setTitle("Year of study")
+    .setChoiceValues(["1st year", "2nd year", "3rd year", "4th year"])
+    .setRequired(true);
+
+  // Q6: Department * (Multiple Choice: Filtered by event target branches)
+  form.addMultipleChoiceItem()
+    .setTitle("Department")
+    .setChoiceValues(EVENT_CONFIG.targetDepartments)
+    .setRequired(true);
+
+  // Q7: Division * (Multiple Choice: Alpha, Beta, Gamma, Delta, Nil)
+  form.addMultipleChoiceItem()
+    .setTitle("Division")
+    .setChoiceValues(["Alpha", "Beta", "Gamma", "Delta", "Nil"])
+    .setRequired(true);
+
+  // Q8: Are you a CSI member? * (Multiple Choice: Yes, No)
+  form.addMultipleChoiceItem()
+    .setTitle("Are you a CSI member?")
     .setChoiceValues(["Yes", "No"])
     .setRequired(true);
 
-  // 2. Create the Destination Google Sheet inside CSI Google Drive
+  // Q9: If yes, enter CSI membership id (Optional Short Answer)
+  form.addTextItem()
+    .setTitle("If yes, enter CSI membership id")
+    .setHelpText("Your membership ID can be found in your membership card")
+    .setRequired(false);
+
+  // 2. Create Destination Google Sheet in CSI Google Drive
   const sheetTitle = `${EVENT_CONFIG.eventName} - Registrations (Responses)`;
   const spreadsheet = SpreadsheetApp.create(sheetTitle);
 
@@ -96,19 +95,13 @@ function createRegistrationFormAndSheet() {
   const sheetUrl = spreadsheet.getUrl();
 
   Logger.log("=================================================");
-  Logger.log("✅ REGISTRATION SYSTEM SUCCESSFULLY CREATED!");
+  Logger.log(`✅ FORM CREATED FOR: ${EVENT_CONFIG.eventName.toUpperCase()}`);
   Logger.log("=================================================");
-  Logger.log("1. Public Form URL (for students to register):");
+  Logger.log("1. Public Form Link (for RSMS Notice):");
   Logger.log(formUrl);
-  Logger.log("\n2. Form Edit URL (to modify questions in Drive):");
+  Logger.log("\n2. Edit Form in Drive (add writeup & theme):");
   Logger.log(editUrl);
-  Logger.log("\n3. Google Sheet Responses URL (for attendance sheet sync):");
+  Logger.log("\n3. Responses Sheet Link (paste into CSI Operations to map Attendance):");
   Logger.log(sheetUrl);
   Logger.log("=================================================");
-
-  return {
-    formUrl: formUrl,
-    editUrl: editUrl,
-    sheetUrl: sheetUrl
-  };
 }
