@@ -571,7 +571,7 @@ export default function EventContainerPage() {
                       mockBitlyUrl
                     )
                   }
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 text-[15px] font-bold flex items-center gap-2 transition shadow"
+                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 text-[16px] font-bold flex items-center gap-2 transition shadow"
                   title="Direct Download as PDF"
                 >
                   <Download className="w-4 h-4" />
@@ -592,7 +592,7 @@ export default function EventContainerPage() {
                       mockBitlyUrl
                     )
                   }
-                  className="px-4 py-2 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-[15px] font-bold flex items-center gap-2 transition shadow"
+                  className="px-4 py-2 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
                   title="Direct Download as Word (.doc)"
                 >
                   <FileDown className="w-4 h-4" />
@@ -602,12 +602,12 @@ export default function EventContainerPage() {
             </div>
 
             {/* Exact RSMS Notice Preview (Pure Black/White with Clickable Blue Link) */}
-            <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[15px] leading-relaxed shadow-inner space-y-3.5">
-              <p className="font-bold underline text-lg tracking-wide">{event.event_name}</p>
+            <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[17px] leading-relaxed shadow-inner space-y-4">
+              <p className="font-bold underline text-xl tracking-wide">{event.event_name}</p>
 
               <p className="text-justify leading-relaxed">{rsmsDescription}</p>
 
-              <div className="space-y-1 font-bold">
+              <div className="space-y-1.5 font-bold">
                 <p>Date: {formattedDateFull}</p>
                 <p>Time: {timeFormatted}</p>
                 <p>{venueLabel}: {event.venue}</p>
@@ -615,7 +615,7 @@ export default function EventContainerPage() {
 
               <div className="space-y-1">
                 <p className="font-semibold">Student Coordinators:</p>
-                <div className="space-y-0.5 pl-1">
+                <div className="space-y-1 pl-1">
                   {coordinatorListWithClass.map((c) => (
                     <p key={c}>{c}</p>
                   ))}
@@ -661,7 +661,7 @@ export default function EventContainerPage() {
                       facultyCoordinator
                     )
                   }
-                  className="px-4 py-2 rounded-lg bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 border border-cyan-500/40 text-[15px] font-bold flex items-center gap-2 transition shadow"
+                  className="px-4 py-2 rounded-lg bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 border border-cyan-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
                   title="Direct Download as PDF"
                 >
                   <Download className="w-4 h-4" />
@@ -680,7 +680,7 @@ export default function EventContainerPage() {
                       facultyCoordinator
                     )
                   }
-                  className="px-4 py-2 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-[15px] font-bold flex items-center gap-2 transition shadow"
+                  className="px-4 py-2 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
                   title="Direct Download as Word (.doc)"
                 >
                   <FileDown className="w-4 h-4" />
@@ -690,15 +690,15 @@ export default function EventContainerPage() {
             </div>
 
             {/* Exact Permission Letter Preview */}
-            <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[15px] leading-relaxed shadow-inner space-y-3.5">
-              <div className="space-y-0.5">
+            <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[17px] leading-relaxed shadow-inner space-y-4">
+              <div className="space-y-1">
                 <p>To</p>
                 <p>The Principal,</p>
                 <p>Rajagiri School of Engineering and Technology,</p>
                 <p>Kakkanad.</p>
               </div>
 
-              <p className="font-bold pt-1">
+              <p className="font-bold pt-1 text-lg">
                 Subject: Request for Conducting Technical Event &quot;{event.event_name}&quot;
               </p>
 
@@ -723,9 +723,9 @@ export default function EventContainerPage() {
 
               <p>We hope for your kind support and approval for the successful conduct of the event.</p>
 
-              <div className="pt-2 space-y-0.5">
+              <div className="pt-2 space-y-1">
                 <p>Yours faithfully,</p>
-                <p className="font-bold pt-3">{facultyCoordinator}</p>
+                <p className="font-bold pt-2">{facultyCoordinator}</p>
                 <p>Faculty Coordinator</p>
                 <p>CSI Student Branch, RSET</p>
               </div>
@@ -830,13 +830,13 @@ export default function EventContainerPage() {
               {/* Form Questions Overview matching user screenshots */}
               <div className="bg-black p-5 rounded-xl border border-purple-500/30 space-y-4">
                 <div className="flex items-center justify-between pb-2.5 border-b border-purple-500/20">
-                  <span className="font-bold text-slate-200 text-[15px]">Official Form Questions (10 Fields):</span>
-                  <span className="text-[13px] px-3 py-1 rounded bg-amber-500/20 text-amber-300 font-mono font-semibold">
+                  <span className="font-bold text-slate-200 text-[17px]">Official Form Questions (10 Fields):</span>
+                  <span className="text-[14px] px-3 py-1 rounded bg-amber-500/20 text-amber-300 font-mono font-semibold">
                     All Required except CSI ID
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[15px]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-[17px]">
                   <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">1.</span>
                     <span className="font-bold text-white">Email</span>
@@ -846,7 +846,7 @@ export default function EventContainerPage() {
                     <span className="text-amber-400 font-bold font-mono">2.</span>
                     <span className="font-bold text-white">Title</span>
                     <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[14px] font-normal">(Mr / Ms)</span>
+                    <span className="text-slate-400 text-[15px] font-normal">(Mr / Ms)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">3.</span>
@@ -867,7 +867,7 @@ export default function EventContainerPage() {
                     <span className="text-amber-400 font-bold font-mono">6.</span>
                     <span className="font-bold text-white">Year of study</span>
                     <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[14px] font-normal">(1st – 4th yr)</span>
+                    <span className="text-slate-400 text-[15px] font-normal">(1st – 4th yr)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">7.</span>
@@ -878,7 +878,7 @@ export default function EventContainerPage() {
                     <span className="text-amber-400 font-bold font-mono">8.</span>
                     <span className="font-bold text-white">Division</span>
                     <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[14px] font-normal">(Alpha - Nil)</span>
+                    <span className="text-slate-400 text-[15px] font-normal">(Alpha - Nil)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">9.</span>
@@ -888,20 +888,20 @@ export default function EventContainerPage() {
                   <div className="flex items-center gap-2 col-span-1 md:col-span-2">
                     <span className="text-slate-500 font-bold font-mono">10.</span>
                     <span className="font-bold text-white">If yes, enter CSI membership id</span>
-                    <span className="text-slate-400 text-[14px] font-normal">(Optional)</span>
+                    <span className="text-slate-400 text-[15px] font-normal">(Optional)</span>
                   </div>
                 </div>
 
                 {/* Dynamic Departments based on event container */}
                 <div className="pt-3 border-t border-purple-500/20 space-y-2">
-                  <span className="text-[15px] text-slate-300 font-semibold block">
+                  <span className="text-[17px] text-slate-300 font-semibold block">
                     Dynamic Department Options (injected from event branches):
                   </span>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2.5">
                     {eventDepartments.map((dept) => (
                       <span
                         key={dept}
-                        className="px-3 py-1 rounded-md bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold font-mono text-[14px]"
+                        className="px-3.5 py-1.5 rounded-md bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold font-mono text-[15px]"
                       >
                         {dept}
                       </span>
@@ -919,7 +919,7 @@ export default function EventContainerPage() {
                   <button
                     onClick={handleCreateFormInDrive}
                     disabled={isCreatingFormInDrive}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-purple-600 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white text-[15px] font-extrabold flex items-center gap-2 transition shadow-lg shadow-purple-600/30 disabled:opacity-50"
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-purple-600 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white text-[16px] font-extrabold flex items-center gap-2 transition shadow-lg shadow-purple-600/30 disabled:opacity-50"
                   >
                     {isCreatingFormInDrive ? (
                       <>
@@ -939,7 +939,7 @@ export default function EventContainerPage() {
                     <button
                       onClick={handleSyncFinalRosterFromDrive}
                       disabled={isSyncingFromDrive}
-                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[15px] font-extrabold flex items-center gap-2 transition shadow-lg shadow-emerald-600/30 disabled:opacity-50"
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[16px] font-extrabold flex items-center gap-2 transition shadow-lg shadow-emerald-600/30 disabled:opacity-50"
                       title="Fetch final responses from Google Sheet into Attendance Sheet"
                     >
                       {isSyncingFromDrive ? (
@@ -959,7 +959,7 @@ export default function EventContainerPage() {
                     <button
                       onClick={handleToggleRegistrationStatus}
                       disabled={isTogglingRegistration}
-                      className={`px-4 py-2.5 rounded-xl text-[15px] font-bold border transition flex items-center gap-2 ${
+                      className={`px-4 py-2.5 rounded-xl text-[16px] font-bold border transition flex items-center gap-2 ${
                         event.is_registration_closed
                           ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600"
                           : "bg-red-950/60 hover:bg-red-900/80 text-red-200 border-red-500/40"
@@ -976,7 +976,7 @@ export default function EventContainerPage() {
 
               <button
                 onClick={() => copyToClipboard(event.google_form_url || mockRegUrl, "regUrl")}
-                className="text-[15px] text-amber-300 hover:text-white font-bold underline"
+                className="text-[16px] text-amber-300 hover:text-white font-bold underline"
               >
                 {copiedSection === "regUrl" ? "Copied Link!" : "Copy Public Link"}
               </button>
@@ -992,7 +992,7 @@ export default function EventContainerPage() {
               </span>
               <button
                 onClick={() => copyToClipboard(mockFeedbackUrl, "feedUrl")}
-                className="text-[15px] text-pink-300 hover:text-white font-bold underline"
+                className="text-[16px] text-pink-300 hover:text-white font-bold underline"
               >
                 {copiedSection === "feedUrl" ? "Copied URL!" : "Copy Feedback URL"}
               </button>
@@ -1002,10 +1002,10 @@ export default function EventContainerPage() {
               <div className="w-28 h-28 bg-white p-2 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
                 <QrCode className="w-24 h-24 text-black" />
               </div>
-              <div className="space-y-1.5 text-center sm:text-left">
-                <p className="font-bold text-white text-lg">Projector Display Ready</p>
-                <p className="text-slate-300 text-[15px]">Directs attendees to official feedback survey at the end of the event.</p>
-                <p className="text-cyan-300 font-mono text-[15px] break-all">{mockFeedbackUrl}</p>
+              <div className="space-y-2 text-center sm:text-left">
+                <p className="font-bold text-white text-xl">Projector Display Ready</p>
+                <p className="text-slate-300 text-[17px]">Directs attendees to official feedback survey at the end of the event.</p>
+                <p className="text-cyan-300 font-mono text-[17px] break-all">{mockFeedbackUrl}</p>
               </div>
             </div>
           </div>
@@ -1024,7 +1024,7 @@ export default function EventContainerPage() {
               {event.registered_attendees && event.registered_attendees.length > 0 && (
                 <button
                   onClick={handleClearAttendees}
-                  className="px-3.5 py-2 rounded-lg bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-500/30 text-[15px] font-bold transition"
+                  className="px-4 py-2 rounded-lg bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-500/30 text-[16px] font-bold transition"
                   title="Clear attendees and revert to blank roster"
                 >
                   Reset Roster
@@ -1041,7 +1041,7 @@ export default function EventContainerPage() {
                     event.registered_attendees
                   )
                 }
-                className="px-4 py-2 rounded-lg bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/40 text-[15px] font-bold flex items-center gap-2 transition shadow"
+                className="px-4 py-2 rounded-lg bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
                 title="Direct Download Attendance Sheet as PDF"
               >
                 <Download className="w-4 h-4" />
@@ -1058,7 +1058,7 @@ export default function EventContainerPage() {
                     event.registered_attendees
                   )
                 }
-                className="px-4 py-2 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-[15px] font-bold flex items-center gap-2 transition shadow"
+                className="px-4 py-2 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
                 title="Direct Download Attendance Sheet as Word (.doc)"
               >
                 <FileDown className="w-4 h-4" />
@@ -1084,10 +1084,10 @@ export default function EventContainerPage() {
               </div>
 
               <div className="text-center flex-1 space-y-1.5">
-                <h4 className="text-base sm:text-[18px] font-bold tracking-normal uppercase text-black">
+                <h4 className="text-lg sm:text-[20px] font-bold tracking-normal uppercase text-black">
                   COMPUTER SOCIETY OF INDIA SB RSET
                 </h4>
-                <p className="text-sm sm:text-[16px] font-bold tracking-wide text-black">
+                <p className="text-base sm:text-[18px] font-bold tracking-wide text-black">
                   ATTENDANCE SHEET
                 </p>
               </div>
@@ -1104,55 +1104,55 @@ export default function EventContainerPage() {
 
             {/* Metadata Grid in Calibri */}
             <div
-              className="space-y-1 text-[15px] text-black mb-5 pl-0.5 leading-snug"
+              className="space-y-1.5 text-[17px] text-black mb-5 pl-0.5 leading-snug"
               style={{ fontFamily: "'Calibri', 'Segoe UI', Arial, sans-serif" }}
             >
               <div className="flex items-start py-0.5">
-                <span className="w-52 font-bold shrink-0 text-[15px]">EVENT NAME</span>
-                <span className="font-bold text-[15px]">: {event.event_name.toUpperCase()}</span>
+                <span className="w-52 font-bold shrink-0 text-[17px]">EVENT NAME</span>
+                <span className="font-bold text-[17px]">: {event.event_name.toUpperCase()}</span>
               </div>
               <div className="flex items-start py-0.5">
-                <span className="w-52 font-bold shrink-0 text-[15px]">DATE</span>
-                <span className="font-bold text-[15px]">: {formatShortSlashDate(event.event_date)}</span>
+                <span className="w-52 font-bold shrink-0 text-[17px]">DATE</span>
+                <span className="font-bold text-[17px]">: {formatShortSlashDate(event.event_date)}</span>
               </div>
               <div className="flex items-start py-0.5">
-                <span className="w-52 font-bold shrink-0 text-[15px]">VENUE</span>
-                <span className="font-bold text-[15px]">: {event.venue}</span>
+                <span className="w-52 font-bold shrink-0 text-[17px]">VENUE</span>
+                <span className="font-bold text-[17px]">: {event.venue}</span>
               </div>
               <div className="flex items-start py-0.5">
-                <span className="w-52 font-bold shrink-0 text-[15px]">COORDINATORS</span>
-                <span className="font-bold text-[15px]">: {event.assigned_coordinators.join(", ") || "CSI Coordinators"}</span>
+                <span className="w-52 font-bold shrink-0 text-[17px]">COORDINATORS</span>
+                <span className="font-bold text-[17px]">: {event.assigned_coordinators.join(", ") || "CSI Coordinators"}</span>
               </div>
               <div className="flex items-start py-0.5">
-                <span className="w-52 font-bold shrink-0 text-[15px]">No. of participants</span>
-                <span className="font-bold text-[15px]">: {event.registered_attendees && event.registered_attendees.length > 0 ? event.registered_attendees.length : "__________________"}</span>
+                <span className="w-52 font-bold shrink-0 text-[17px]">No. of participants</span>
+                <span className="font-bold text-[17px]">: {event.registered_attendees && event.registered_attendees.length > 0 ? event.registered_attendees.length : "__________________"}</span>
               </div>
             </div>
 
             {/* Attendance Roster Table with Proportional Column Widths */}
-            <table className="w-full text-[15px] text-left border-collapse border border-black table-fixed">
+            <table className="w-full text-[17px] text-left border-collapse border border-black table-fixed">
               <thead>
-                <tr className="border-b border-black text-black font-bold uppercase text-center bg-white text-[15px]">
-                  <th className="border border-black py-2.5 px-2 w-[10%] text-center text-[15px]">SL NO</th>
-                  <th className="border border-black py-2.5 px-3 w-[34%] text-left text-[15px]">NAME</th>
-                  <th className="border border-black py-2.5 px-2 w-[16%] text-center text-[15px]">GENDER</th>
-                  <th className="border border-black py-2.5 px-2 w-[16%] text-center text-[15px]">CLASS</th>
-                  <th className="border border-black py-2.5 px-2 w-[24%] text-center text-[15px]">SIGNATURE</th>
+                <tr className="border-b border-black text-black font-bold uppercase text-center bg-white text-[17px]">
+                  <th className="border border-black py-2.5 px-2 w-[10%] text-center text-[17px]">SL NO</th>
+                  <th className="border border-black py-2.5 px-3 w-[34%] text-left text-[17px]">NAME</th>
+                  <th className="border border-black py-2.5 px-2 w-[16%] text-center text-[17px]">GENDER</th>
+                  <th className="border border-black py-2.5 px-2 w-[16%] text-center text-[17px]">CLASS</th>
+                  <th className="border border-black py-2.5 px-2 w-[24%] text-center text-[17px]">SIGNATURE</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black text-black text-[15px]">
+              <tbody className="divide-y divide-black text-black text-[17px]">
                 {(event.registered_attendees && event.registered_attendees.length > 0
                   ? event.registered_attendees
                   : [1, 2, 3, 4, 5, 6, 7]
                 ).map((item, idx) => {
                   const isAttendee = typeof item === "object";
                   return (
-                    <tr key={idx} className="h-10 text-[15px]">
-                      <td className="border border-black text-center py-2 px-2 font-bold text-[15px]">{idx + 1}</td>
-                      <td className="border border-black py-2 px-3 text-left text-[15px]">{isAttendee ? item.name : "\u00A0"}</td>
-                      <td className="border border-black text-center py-2 px-2 text-[15px]">{isAttendee ? item.gender || "" : "\u00A0"}</td>
-                      <td className="border border-black text-center py-2 px-2 text-[15px]">{isAttendee ? item.class_batch || "" : "\u00A0"}</td>
-                      <td className="border border-black py-2 px-2 text-[15px]">&nbsp;</td>
+                    <tr key={idx} className="h-10 text-[17px]">
+                      <td className="border border-black text-center py-2 px-2 font-bold text-[17px]">{idx + 1}</td>
+                      <td className="border border-black py-2 px-3 text-left text-[17px]">{isAttendee ? item.name : "\u00A0"}</td>
+                      <td className="border border-black text-center py-2 px-2 text-[17px]">{isAttendee ? item.gender || "" : "\u00A0"}</td>
+                      <td className="border border-black text-center py-2 px-2 text-[17px]">{isAttendee ? item.class_batch || "" : "\u00A0"}</td>
+                      <td className="border border-black py-2 px-2 text-[17px]">&nbsp;</td>
                     </tr>
                   );
                 })}
