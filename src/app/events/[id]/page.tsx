@@ -545,220 +545,200 @@ export default function EventContainerPage() {
           Auto-Generated Documents &amp; Operations Pipeline
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* LINE 4: RSMS Notice */}
-          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 flex flex-col justify-between shadow-xl">
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                <span className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-slate-300" />
-                  Line 4: RSMS Notice (Official Black &amp; White)
-                </span>
+        <div className="space-y-6">
+          {/* RSMS Notice */}
+          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="text-base font-bold text-slate-200 tracking-wide flex items-center gap-2">
+                <FileText className="w-5 h-5 text-slate-300" />
+                RSMS Notice (Official Black &amp; White)
+              </span>
 
-                {/* Document Actions */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() =>
-                      exportRsmsPdf(
-                        `RSMS_Notice_${event.event_name}`,
-                        event.event_name,
-                        formattedDateFull,
-                        timeFormatted,
-                        event.venue,
-                        venueLabel,
-                        rsmsDescription,
-                        coordinatorListWithClass,
-                        facultyCoordinator,
-                        mockBitlyUrl
-                      )
-                    }
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 text-xs font-bold flex items-center gap-1.5 transition shadow"
-                    title="Direct Download as PDF"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Download PDF</span>
-                  </button>
-                  <button
-                    onClick={() =>
-                      exportRsmsWord(
-                        `RSMS_Notice_${event.event_name}`,
-                        event.event_name,
-                        formattedDateFull,
-                        timeFormatted,
-                        event.venue,
-                        venueLabel,
-                        rsmsDescription,
-                        coordinatorListWithClass,
-                        facultyCoordinator,
-                        mockBitlyUrl
-                      )
-                    }
-                    className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
-                    title="Direct Download as Word (.doc)"
-                  >
-                    <FileDown className="w-3.5 h-3.5" />
-                    <span>Download Word</span>
-                  </button>
-                </div>
-              </div>
-
-              <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                Official clean notification format without colored lines or graphics.
-              </p>
-
-              {/* Exact RSMS Notice Preview (Pure Black/White with Clickable Blue Link) */}
-              <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[17px] leading-relaxed shadow-inner space-y-4 max-h-96 overflow-y-auto">
-                <p className="font-bold underline text-lg tracking-wide">{event.event_name}</p>
-
-                <p className="text-justify leading-relaxed">{rsmsDescription}</p>
-
-                <div className="space-y-1 font-bold">
-                  <p>Date: {formattedDateFull}</p>
-                  <p>Time: {timeFormatted}</p>
-                  <p>{venueLabel}: {event.venue}</p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <p>Student Coordinators:</p>
-                  <div className="space-y-1 pl-1">
-                    {coordinatorListWithClass.map((c) => (
-                      <p key={c}>{c}</p>
-                    ))}
-                  </div>
-                </div>
-
-                <p>Faculty Coordinator: {facultyCoordinator}</p>
-
-                <p>
-                  Registration Link:{" "}
-                  <a
-                    href={mockBitlyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 underline font-sans font-medium"
-                  >
-                    {mockBitlyUrl}
-                  </a>
-                </p>
+              {/* Document Actions */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() =>
+                    exportRsmsPdf(
+                      `RSMS_Notice_${event.event_name}`,
+                      event.event_name,
+                      formattedDateFull,
+                      timeFormatted,
+                      event.venue,
+                      venueLabel,
+                      rsmsDescription,
+                      coordinatorListWithClass,
+                      facultyCoordinator,
+                      mockBitlyUrl
+                    )
+                  }
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  title="Direct Download as PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </button>
+                <button
+                  onClick={() =>
+                    exportRsmsWord(
+                      `RSMS_Notice_${event.event_name}`,
+                      event.event_name,
+                      formattedDateFull,
+                      timeFormatted,
+                      event.venue,
+                      venueLabel,
+                      rsmsDescription,
+                      coordinatorListWithClass,
+                      facultyCoordinator,
+                      mockBitlyUrl
+                    )
+                  }
+                  className="px-3.5 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  title="Direct Download as Word (.doc)"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>Download Word</span>
+                </button>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-purple-500/20 text-xs text-slate-400">
-              Only clickable link is highlighted in blue • Strict College RSMS Format
+            {/* Exact RSMS Notice Preview (Pure Black/White with Clickable Blue Link) */}
+            <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[15px] leading-relaxed shadow-inner space-y-3.5">
+              <p className="font-bold underline text-lg tracking-wide">{event.event_name}</p>
+
+              <p className="text-justify leading-relaxed">{rsmsDescription}</p>
+
+              <div className="space-y-1 font-bold">
+                <p>Date: {formattedDateFull}</p>
+                <p>Time: {timeFormatted}</p>
+                <p>{venueLabel}: {event.venue}</p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="font-semibold">Student Coordinators:</p>
+                <div className="space-y-0.5 pl-1">
+                  {coordinatorListWithClass.map((c) => (
+                    <p key={c}>{c}</p>
+                  ))}
+                </div>
+              </div>
+
+              <p>Faculty Coordinator: {facultyCoordinator}</p>
+
+              <p>
+                Registration Link:{" "}
+                <a
+                  href={mockBitlyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 underline font-sans font-medium"
+                >
+                  {mockBitlyUrl}
+                </a>
+              </p>
             </div>
           </div>
 
-          {/* LINE 3: Permission Letter */}
-          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 flex flex-col justify-between shadow-xl">
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                <span className="text-sm font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-cyan-400" />
-                  Line 3: Permission Letter to Principal
-                </span>
+          {/* Permission Letter */}
+          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="text-base font-bold text-cyan-300 tracking-wide flex items-center gap-2">
+                <FileText className="w-5 h-5 text-cyan-400" />
+                Permission Letter to Principal
+              </span>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() =>
-                      exportPermissionPdf(
-                        `Permission_Letter_${event.event_name}`,
-                        event.event_name,
-                        formattedDateFull,
-                        timeFormatted,
-                        event.venue,
-                        event.brief_description,
-                        branchesString,
-                        facultyCoordinator
-                      )
-                    }
-                    className="px-3 py-1.5 rounded-lg bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
-                    title="Direct Download as PDF"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Download PDF</span>
-                  </button>
-                  <button
-                    onClick={() =>
-                      exportPermissionWord(
-                        `Permission_Letter_${event.event_name}`,
-                        event.event_name,
-                        formattedDateFull,
-                        timeFormatted,
-                        event.venue,
-                        event.brief_description,
-                        branchesString,
-                        facultyCoordinator
-                      )
-                    }
-                    className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
-                    title="Direct Download as Word (.doc)"
-                  >
-                    <FileDown className="w-3.5 h-3.5" />
-                    <span>Download Word</span>
-                  </button>
-                </div>
-              </div>
-
-              <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                Formal institutional permission request addressed to The Principal, RSET Kakkanad.
-              </p>
-
-              {/* Exact Permission Letter Preview */}
-              <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[16px] leading-relaxed shadow-inner space-y-3.5 max-h-96 overflow-y-auto">
-                <div className="space-y-0.5">
-                  <p>To</p>
-                  <p>The Principal,</p>
-                  <p>Rajagiri School of Engineering and Technology,</p>
-                  <p>Kakkanad.</p>
-                </div>
-
-                <p className="font-bold pt-1">
-                  Subject: Request for Conducting Technical Event &quot;{event.event_name}&quot;
-                </p>
-
-                <p>Respected Sir,</p>
-
-                <p className="text-justify">
-                  The Computer Society of India (CSI) Student Branch, RSET, is planning to organize a technical event titled <strong>{event.event_name}</strong>. {event.brief_description || "The event is designed to introduce participants to core Computer Science concepts and technical skills through interactive sessions and challenges."}
-                </p>
-
-                <p className="text-justify">
-                  The event is open to students from the <strong>{branchesString}</strong> departments and will be conducted in the <strong>{event.venue}</strong> using a software-based platform developed by the CSI Student Branch.
-                </p>
-
-                <p>We kindly request your permission to conduct this event as per the details given below:</p>
-
-                <div className="space-y-1 font-bold text-left">
-                  <p>Event: {event.event_name}</p>
-                  <p>Date: {formattedDateFull}</p>
-                  <p>Time: {timeFormatted}</p>
-                  <p>Venue: {event.venue}</p>
-                </div>
-
-                <p>We hope for your kind support and approval for the successful conduct of the event.</p>
-
-                <div className="pt-2 space-y-0.5">
-                  <p>Yours faithfully,</p>
-                  <p className="font-bold pt-3">{facultyCoordinator}</p>
-                  <p>Faculty Coordinator</p>
-                  <p>CSI Student Branch, RSET</p>
-                </div>
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() =>
+                    exportPermissionPdf(
+                      `Permission_Letter_${event.event_name}`,
+                      event.event_name,
+                      formattedDateFull,
+                      timeFormatted,
+                      event.venue,
+                      event.brief_description,
+                      branchesString,
+                      facultyCoordinator
+                    )
+                  }
+                  className="px-3.5 py-1.5 rounded-lg bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  title="Direct Download as PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </button>
+                <button
+                  onClick={() =>
+                    exportPermissionWord(
+                      `Permission_Letter_${event.event_name}`,
+                      event.event_name,
+                      formattedDateFull,
+                      timeFormatted,
+                      event.venue,
+                      event.brief_description,
+                      branchesString,
+                      facultyCoordinator
+                    )
+                  }
+                  className="px-3.5 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  title="Direct Download as Word (.doc)"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>Download Word</span>
+                </button>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-purple-500/20 text-xs text-slate-400">
-              Strict Official Letterhead Template (Addressed to The Principal)
+            {/* Exact Permission Letter Preview */}
+            <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[15px] leading-relaxed shadow-inner space-y-3.5">
+              <div className="space-y-0.5">
+                <p>To</p>
+                <p>The Principal,</p>
+                <p>Rajagiri School of Engineering and Technology,</p>
+                <p>Kakkanad.</p>
+              </div>
+
+              <p className="font-bold pt-1">
+                Subject: Request for Conducting Technical Event &quot;{event.event_name}&quot;
+              </p>
+
+              <p>Respected Sir,</p>
+
+              <p className="text-justify">
+                The Computer Society of India (CSI) Student Branch, RSET, is planning to organize a technical event titled <strong>{event.event_name}</strong>. {event.brief_description || "The event is designed to introduce participants to core Computer Science concepts and technical skills through interactive sessions and challenges."}
+              </p>
+
+              <p className="text-justify">
+                The event is open to students from the <strong>{branchesString}</strong> departments and will be conducted in the <strong>{event.venue}</strong> using a software-based platform developed by the CSI Student Branch.
+              </p>
+
+              <p>We kindly request your permission to conduct this event as per the details given below:</p>
+
+              <div className="space-y-1 font-bold text-left">
+                <p>Event: {event.event_name}</p>
+                <p>Date: {formattedDateFull}</p>
+                <p>Time: {timeFormatted}</p>
+                <p>Venue: {event.venue}</p>
+              </div>
+
+              <p>We hope for your kind support and approval for the successful conduct of the event.</p>
+
+              <div className="pt-2 space-y-0.5">
+                <p>Yours faithfully,</p>
+                <p className="font-bold pt-3">{facultyCoordinator}</p>
+                <p>Faculty Coordinator</p>
+                <p>CSI Student Branch, RSET</p>
+              </div>
             </div>
           </div>
 
-          {/* LINE 1: Registration Form */}
-          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 flex flex-col justify-between shadow-xl">
+          {/* Registration Form */}
+          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 shadow-xl">
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <span className="text-base font-bold text-amber-300 tracking-wide flex items-center gap-2">
                   <ExternalLink className="w-5 h-5 text-amber-400" />
-                  Line 1: Registration Form
+                  Registration Form
                 </span>
                 <div className="flex items-center gap-2">
                   {event.google_form_url && (
@@ -788,9 +768,6 @@ export default function EventContainerPage() {
                   )}
                 </div>
               </div>
-              <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                Automate your official Google Form &amp; Responses Sheet inside your CSI Google Drive, then sync responses directly to the Attendance Sheet.
-              </p>
 
               {/* Status / Drive feedback notice */}
               {driveActionNotice && (
@@ -819,7 +796,7 @@ export default function EventContainerPage() {
                       href={event.google_form_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-cyan-300 hover:text-cyan-200 flex items-center gap-1.5 transition font-semibold"
+                      className="p-2.5 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-cyan-300 hover:text-cyan-200 flex items-center gap-1.5 transition font-semibold"
                     >
                       <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
                       <span className="truncate">Live Student Form</span>
@@ -829,7 +806,7 @@ export default function EventContainerPage() {
                         href={event.google_form_edit_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-purple-300 hover:text-purple-200 flex items-center gap-1.5 transition font-semibold"
+                        className="p-2.5 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-purple-300 hover:text-purple-200 flex items-center gap-1.5 transition font-semibold"
                       >
                         <FileCode className="w-3.5 h-3.5 text-purple-400" />
                         <span className="truncate">Edit in Forms</span>
@@ -840,7 +817,7 @@ export default function EventContainerPage() {
                         href={event.google_sheet_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-emerald-300 hover:text-emerald-200 flex items-center gap-1.5 transition font-semibold"
+                        className="p-2.5 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-emerald-300 hover:text-emerald-200 flex items-center gap-1.5 transition font-semibold"
                       >
                         <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
                         <span className="truncate">Responses Sheet</span>
@@ -851,80 +828,80 @@ export default function EventContainerPage() {
               )}
 
               {/* Form Questions Overview matching user screenshots */}
-              <div className="bg-black p-4 rounded-xl border border-purple-500/30 space-y-2.5 text-xs">
+              <div className="bg-black p-5 rounded-xl border border-purple-500/30 space-y-3.5">
                 <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
-                  <span className="font-bold text-slate-200">Official Form Questions (10 Fields):</span>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                  <span className="font-bold text-slate-200 text-sm">Official Form Questions (10 Fields):</span>
+                  <span className="text-xs px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
                     All Required except CSI ID
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-1.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[15px]">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">1.</span>
                     <span className="font-bold text-white">Email</span>
                     <span className="text-red-400 font-bold">*</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">2.</span>
                     <span className="font-bold text-white">Title</span>
                     <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[11px] font-normal">(Mr / Ms)</span>
+                    <span className="text-slate-400 text-xs font-normal">(Mr / Ms)</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">3.</span>
                     <span className="font-bold text-white">Name</span>
                     <span className="text-red-400 font-bold">*</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">4.</span>
                     <span className="font-bold text-white">Rajagiri Email ID</span>
                     <span className="text-red-400 font-bold">*</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">5.</span>
                     <span className="font-bold text-white">Contact No.(Preferably WhatsApp)</span>
                     <span className="text-red-400 font-bold">*</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">6.</span>
                     <span className="font-bold text-white">Year of study</span>
                     <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[11px] font-normal">(1st – 4th yr)</span>
+                    <span className="text-slate-400 text-xs font-normal">(1st – 4th yr)</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">7.</span>
                     <span className="font-bold text-white">Department</span>
                     <span className="text-red-400 font-bold">*</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">8.</span>
                     <span className="font-bold text-white">Division</span>
                     <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[11px] font-normal">(Alpha - Nil)</span>
+                    <span className="text-slate-400 text-xs font-normal">(Alpha - Nil)</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-amber-400 font-bold font-mono">9.</span>
                     <span className="font-bold text-white">Are you a CSI member?</span>
                     <span className="text-red-400 font-bold">*</span>
                   </div>
-                  <div className="flex items-center gap-1.5 col-span-1 sm:col-span-2">
+                  <div className="flex items-center gap-2 col-span-1 md:col-span-2">
                     <span className="text-slate-500 font-bold font-mono">10.</span>
                     <span className="font-bold text-white">If yes, enter CSI membership id</span>
-                    <span className="text-slate-400 text-[11px] font-normal">(Optional)</span>
+                    <span className="text-slate-400 text-xs font-normal">(Optional)</span>
                   </div>
                 </div>
 
                 {/* Dynamic Departments based on event container */}
-                <div className="pt-2 border-t border-purple-500/20 space-y-1.5">
-                  <span className="text-[11px] text-slate-400 font-semibold block">
+                <div className="pt-2.5 border-t border-purple-500/20 space-y-1.5">
+                  <span className="text-xs text-slate-400 font-semibold block">
                     Dynamic Department Options (injected from event branches):
                   </span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {eventDepartments.map((dept) => (
                       <span
                         key={dept}
-                        className="px-2 py-0.5 rounded-md bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold font-mono text-[11px]"
+                        className="px-2.5 py-1 rounded-md bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold font-mono text-xs"
                       >
                         {dept}
                       </span>
@@ -1006,51 +983,42 @@ export default function EventContainerPage() {
             </div>
           </div>
 
-          {/* LINE 2: Feedback Form & QR Code */}
-          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 flex flex-col justify-between shadow-xl">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-bold text-pink-300 uppercase tracking-wider flex items-center gap-2">
-                  <QrCode className="w-5 h-5 text-pink-400" />
-                  Line 2: Feedback Form &amp; QR Code
-                </span>
-              </div>
-              <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                QR Code redirecting to the feedback form (ready to display on a projector screen or print).
-              </p>
-              <div className="flex items-center gap-5 bg-black p-4 rounded-xl border border-purple-500/30">
-                <div className="w-24 h-24 bg-white p-2 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
-                  <QrCode className="w-20 h-20 text-black" />
-                </div>
-                <div className="space-y-1.5 text-sm">
-                  <p className="font-bold text-white text-base">Projector Display Ready</p>
-                  <p className="text-slate-400 text-xs">Directs attendees to official feedback survey.</p>
-                  <p className="text-cyan-300 font-mono text-xs truncate max-w-[200px]">{mockFeedbackUrl}</p>
-                </div>
-              </div>
-            </div>
-            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between">
+          {/* Feedback Form & QR Code */}
+          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-base font-bold text-pink-300 tracking-wide flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-pink-400" />
+                Feedback Form &amp; QR Code
+              </span>
               <button
                 onClick={() => copyToClipboard(mockFeedbackUrl, "feedUrl")}
-                className="text-sm text-pink-300 hover:text-white font-bold underline"
+                className="text-xs text-pink-300 hover:text-white font-bold underline"
               >
                 {copiedSection === "feedUrl" ? "Copied URL!" : "Copy Feedback URL"}
               </button>
             </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-6 bg-black p-5 rounded-xl border border-purple-500/30">
+              <div className="w-28 h-28 bg-white p-2 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
+                <QrCode className="w-24 h-24 text-black" />
+              </div>
+              <div className="space-y-1.5 text-sm text-center sm:text-left">
+                <p className="font-bold text-white text-base">Projector Display Ready</p>
+                <p className="text-slate-400 text-xs">Directs attendees to official feedback survey at the end of the event.</p>
+                <p className="text-cyan-300 font-mono text-xs break-all">{mockFeedbackUrl}</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* LINE 5: Attendance Sheet with Official Header Logos */}
+        {/* Attendance Sheet */}
         <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-5 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-base font-bold text-emerald-400 tracking-wide flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Line 5: Attendance Sheet (With RSET &amp; CSI Official Logos)
+                Attendance Sheet (With RSET &amp; CSI Official Logos)
               </h3>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Pre-formatted official attendance sheet matching college audit requirements with editable logos.
-              </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {event.registered_attendees && event.registered_attendees.length > 0 && (
