@@ -24,6 +24,12 @@ import {
 } from "lucide-react";
 import { CSIEvent } from "@/lib/types";
 import { getStoredEvents, deleteEvent } from "@/lib/eventsStorage";
+import {
+  exportToPdf,
+  exportToWord,
+  exportAttendancePdf,
+  exportAttendanceWord,
+} from "@/lib/documentExport";
 
 export default function EventContainerPage() {
   const params = useParams();
@@ -130,87 +136,6 @@ We request your kind approval for the venue and audio-visual arrangements.
 
 Sincerely,
 ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}`;
-
-  // Download as Word (.doc)
-  const downloadWordDoc = (title: string, content: string) => {
-    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-    <head><meta charset='utf-8'><title>${title}</title>
-    <style>
-      body { font-family: 'Calibri', sans-serif; font-size: 12pt; line-height: 1.6; color: #000; margin: 40px; }
-      h1 { font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 20px; }
-      pre { font-family: 'Calibri', sans-serif; white-space: pre-wrap; font-size: 11pt; }
-    </style></head><body>`;
-    const footer = `</body></html>`;
-    const sourceHTML = header + `<h1>${title}</h1><pre>${content}</pre>` + footer;
-
-    const blob = new Blob(["\ufeff", sourceHTML], {
-      type: "application/msword",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.doc`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  // Download as PDF (Printable View)
-  const downloadPDF = (title: string, content: string) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      alert("Please allow popups to download/print PDF.");
-      return;
-    }
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${title}</title>
-          <style>
-            body {
-              font-family: Arial, Helvetica, sans-serif;
-              padding: 40px;
-              color: #111;
-              line-height: 1.6;
-              font-size: 14px;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px solid #2563EB;
-              padding-bottom: 15px;
-              margin-bottom: 25px;
-            }
-            .header h2 { margin: 0; color: #1E3A8A; font-size: 20px; text-transform: uppercase; }
-            .header p { margin: 5px 0 0 0; color: #555; font-size: 13px; }
-            pre {
-              white-space: pre-wrap;
-              font-family: inherit;
-              font-size: 13px;
-              line-height: 1.7;
-            }
-            @media print {
-              body { padding: 20px; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h2>COMPUTER SOCIETY OF INDIA (CSI)</h2>
-            <p>Student Branch Chapter • Official Document</p>
-          </div>
-          <pre>${content}</pre>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
 
   const handleEasterEggUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -369,29 +294,22 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
                 </span>
 
                 {/* Document Actions */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    onClick={() => copyToClipboard(rsmsNoticeText, "rsms")}
-                    className="px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition border border-purple-500/30"
+                    onClick={() => exportToPdf(`RSMS_Notice_${event.event_name}`, `RSMS Notice - ${event.event_name}`, rsmsNoticeText)}
+                    className="px-3 py-1.5 rounded-lg bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                    title="Direct Download as PDF"
                   >
-                    {copiedSection === "rsms" ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedSection === "rsms" ? "Copied!" : "Copy RSMS"}</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
                   </button>
                   <button
-                    onClick={() => downloadPDF(`RSMS_Notice_${event.event_name}`, rsmsNoticeText)}
-                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1 transition"
-                    title="Print or Save as PDF"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>PDF</span>
-                  </button>
-                  <button
-                    onClick={() => downloadWordDoc(`RSMS_Notice_${event.event_name}`, rsmsNoticeText)}
-                    className="px-2.5 py-1.5 rounded-lg bg-blue-900/40 hover:bg-blue-800/60 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1 transition"
-                    title="Download as Microsoft Word"
+                    onClick={() => exportToWord(`RSMS_Notice_${event.event_name}`, `RSMS Notice - ${event.event_name}`, `<pre style="font-family: Calibri, sans-serif; font-size: 11pt; white-space: pre-wrap;">${rsmsNoticeText}</pre>`)}
+                    className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                    title="Direct Download as Word (.doc)"
                   >
                     <FileDown className="w-3.5 h-3.5" />
-                    <span>Word</span>
+                    <span>Download Word</span>
                   </button>
                 </div>
               </div>
@@ -421,29 +339,22 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
                 </span>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    onClick={() => copyToClipboard(permissionLetterText, "perm")}
-                    className="px-3 py-1.5 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-200 text-xs font-bold flex items-center gap-1.5 transition border border-cyan-500/30"
+                    onClick={() => exportToPdf(`Permission_Letter_${event.event_name}`, `Permission Letter - ${event.event_name}`, permissionLetterText)}
+                    className="px-3 py-1.5 rounded-lg bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                    title="Direct Download as PDF"
                   >
-                    {copiedSection === "perm" ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedSection === "perm" ? "Copied!" : "Copy Letter"}</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
                   </button>
                   <button
-                    onClick={() => downloadPDF(`Permission_Letter_${event.event_name}`, permissionLetterText)}
-                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1 transition"
-                    title="Print or Save as PDF"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>PDF</span>
-                  </button>
-                  <button
-                    onClick={() => downloadWordDoc(`Permission_Letter_${event.event_name}`, permissionLetterText)}
-                    className="px-2.5 py-1.5 rounded-lg bg-blue-900/40 hover:bg-blue-800/60 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1 transition"
-                    title="Download as Microsoft Word"
+                    onClick={() => exportToWord(`Permission_Letter_${event.event_name}`, `Permission Letter - ${event.event_name}`, `<pre style="font-family: Calibri, sans-serif; font-size: 11pt; white-space: pre-wrap;">${permissionLetterText}</pre>`)}
+                    className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                    title="Direct Download as Word (.doc)"
                   >
                     <FileDown className="w-3.5 h-3.5" />
-                    <span>Word</span>
+                    <span>Download Word</span>
                   </button>
                 </div>
               </div>
@@ -550,13 +461,40 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
                   Pre-formatted attendance roster with Event Title, Venue ({event.venue}), Date, and signature columns.
                 </p>
               </div>
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 text-xs font-bold flex items-center gap-2 transition border border-emerald-500/30 self-start sm:self-auto"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Print Attendance Sheet</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() =>
+                    exportAttendancePdf(
+                      `Attendance_Sheet_${event.event_name}`,
+                      event.event_name,
+                      event.event_date,
+                      event.venue,
+                      event.assigned_coordinators
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-lg bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  title="Direct Download Attendance Sheet as PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </button>
+                <button
+                  onClick={() =>
+                    exportAttendanceWord(
+                      `Attendance_Sheet_${event.event_name}`,
+                      event.event_name,
+                      event.event_date,
+                      event.venue,
+                      event.assigned_coordinators
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  title="Direct Download Attendance Sheet as Word (.doc)"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>Download Word</span>
+                </button>
+              </div>
             </div>
 
             <div className="bg-black p-4 rounded-xl border border-purple-500/30 overflow-x-auto">
