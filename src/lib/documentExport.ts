@@ -181,7 +181,7 @@ export function exportAttendancePdf(
 
   // Table Structure
   const tableY = metaY + 31;
-  const colWidths = [15, 65, 30, 30, 42]; // Total = 182mm (Page width 210 - 28 margin)
+  const colWidths = [18, 56, 32, 32, 44]; // Total = 182mm (Page width 210 - 28 margin)
   const colHeaders = ["SL NO", "NAME", "GENDER", "CLASS", "SIGNATURE"];
   const rowHeight = 8.5;
 
@@ -253,25 +253,25 @@ export function exportAttendanceWord(
   for (let i = 1; i <= 20; i++) {
     tableRows += `
       <tr>
-        <td style="text-align: center; width: 55px; height: 26px;">${i}</td>
-        <td style="width: 250px;">&nbsp;</td>
-        <td style="width: 100px; text-align: center;">&nbsp;</td>
-        <td style="width: 100px; text-align: center;">&nbsp;</td>
-        <td style="width: 140px;">&nbsp;</td>
+        <td style="text-align: center; width: 10%; height: 26px;">${i}</td>
+        <td style="width: 34%;">&nbsp;</td>
+        <td style="width: 16%; text-align: center;">&nbsp;</td>
+        <td style="width: 16%; text-align: center;">&nbsp;</td>
+        <td style="width: 24%;">&nbsp;</td>
       </tr>
     `;
   }
 
   const html = `
     <!-- Top Header Table with Editable Logos -->
-    <table style="width: 100%; border: none; margin-bottom: 20px;">
+    <table style="width: 100%; border: none; margin-bottom: 24px; font-family: Calibri, 'Segoe UI', Arial, sans-serif;">
       <tr style="border: none;">
         <td style="width: 20%; border: none; vertical-align: middle; text-align: left;">
           <img src="${RSET_LOGO_BASE64}" width="65" height="92" alt="RSET Logo" style="display: inline-block;" />
         </td>
         <td style="width: 60%; border: none; vertical-align: middle; text-align: center;">
-          <h3 style="margin: 0; font-size: 13pt; font-weight: bold; text-transform: uppercase;">COMPUTER SOCIETY OF INDIA SB RSET</h3>
-          <p style="margin: 8px 0 0 0; font-size: 12.5pt; font-weight: bold; letter-spacing: 0.5px;">ATTENDANCE SHEET</p>
+          <h3 style="margin: 0; font-family: Calibri, sans-serif; font-size: 13.5pt; font-weight: bold; text-transform: uppercase;">COMPUTER SOCIETY OF INDIA SB RSET</h3>
+          <p style="margin: 8px 0 0 0; font-family: Calibri, sans-serif; font-size: 12.5pt; font-weight: bold; letter-spacing: 0.5px;">ATTENDANCE SHEET</p>
         </td>
         <td style="width: 20%; border: none; vertical-align: middle; text-align: right;">
           <img src="${CSI_LOGO_BASE64}" width="75" height="75" alt="CSI Logo" style="display: inline-block;" />
@@ -280,7 +280,7 @@ export function exportAttendanceWord(
     </table>
 
     <!-- Metadata Block -->
-    <table style="width: 100%; border: none; margin-top: 15px; margin-bottom: 18px; font-size: 11pt; line-height: 1.6;">
+    <table style="width: 100%; border: none; margin-top: 10px; margin-bottom: 18px; font-family: Calibri, 'Segoe UI', Arial, sans-serif; font-size: 11pt; line-height: 1.6;">
       <tr style="border: none;">
         <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">EVENT NAME</td>
         <td style="border: none; font-weight: bold; padding: 2px 0;">: ${eventTitle.toUpperCase()}</td>
@@ -304,14 +304,14 @@ export function exportAttendanceWord(
     </table>
 
     <!-- Attendance Table -->
-    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000;">
+    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-family: Calibri, 'Segoe UI', Arial, sans-serif;">
       <thead>
         <tr style="background-color: #ffffff;">
-          <th style="width: 55px; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">SL NO</th>
-          <th style="width: 250px; border: 1px solid #000; text-align: left; padding: 7px 8px; font-size: 10.5pt;">NAME</th>
-          <th style="width: 100px; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">GENDER</th>
-          <th style="width: 100px; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">CLASS</th>
-          <th style="width: 140px; border: 1px solid #000; text-align: center; padding: 7px 6px; font-size: 10.5pt;">SIGNATURE</th>
+          <th style="width: 10%; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">SL NO</th>
+          <th style="width: 34%; border: 1px solid #000; text-align: left; padding: 7px 8px; font-size: 10.5pt;">NAME</th>
+          <th style="width: 16%; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">GENDER</th>
+          <th style="width: 16%; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">CLASS</th>
+          <th style="width: 24%; border: 1px solid #000; text-align: center; padding: 7px 6px; font-size: 10.5pt;">SIGNATURE</th>
         </tr>
       </thead>
       <tbody>

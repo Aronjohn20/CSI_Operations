@@ -595,10 +595,13 @@ export default function EventContainerPage() {
           </div>
 
           {/* Official Document Sheet Preview (Matches Exact Scanned Format) */}
-          <div className="bg-white text-black p-6 sm:p-8 rounded-xl border border-slate-300 shadow-2xl overflow-x-auto font-sans">
+          <div
+            className="bg-white text-black p-6 sm:p-9 rounded-xl border border-slate-300 shadow-2xl overflow-x-auto"
+            style={{ fontFamily: "'Calibri', 'Segoe UI', Arial, sans-serif" }}
+          >
             {/* Header with Logos */}
-            <div className="flex items-center justify-between border-b-2 border-black pb-4 mb-5 gap-4">
-              <div className="w-20 shrink-0 flex items-center justify-start">
+            <div className="flex items-center justify-between pb-3 mb-6 gap-4">
+              <div className="w-24 shrink-0 flex items-center justify-start">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/logos/rset_logo.png"
@@ -607,16 +610,16 @@ export default function EventContainerPage() {
                 />
               </div>
 
-              <div className="text-center flex-1 space-y-1">
-                <h4 className="text-base sm:text-lg font-black tracking-wide uppercase text-black">
+              <div className="text-center flex-1 space-y-1.5">
+                <h4 className="text-base sm:text-[18px] font-bold tracking-normal uppercase text-black">
                   COMPUTER SOCIETY OF INDIA SB RSET
                 </h4>
-                <p className="text-sm sm:text-base font-extrabold tracking-wider text-black">
+                <p className="text-sm sm:text-[16px] font-bold tracking-wide text-black">
                   ATTENDANCE SHEET
                 </p>
               </div>
 
-              <div className="w-20 shrink-0 flex items-center justify-end">
+              <div className="w-24 shrink-0 flex items-center justify-end">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/logos/csi_logo.png"
@@ -626,49 +629,49 @@ export default function EventContainerPage() {
               </div>
             </div>
 
-            {/* Metadata Grid */}
-            <div className="space-y-1.5 text-sm font-bold text-black mb-6 pl-1 font-mono">
+            {/* Metadata Grid in Calibri */}
+            <div className="space-y-1.5 text-[15px] text-black mb-6 pl-0.5 leading-relaxed">
               <div className="flex items-start">
-                <span className="w-44 uppercase">EVENT NAME</span>
-                <span>: {event.event_name.toUpperCase()}</span>
+                <span className="w-48 font-bold shrink-0">EVENT NAME</span>
+                <span className="font-bold">: {event.event_name.toUpperCase()}</span>
               </div>
               <div className="flex items-start">
-                <span className="w-44 uppercase">DATE</span>
-                <span>: {formatShortSlashDate(event.event_date)}</span>
+                <span className="w-48 font-bold shrink-0">DATE</span>
+                <span className="font-bold">: {formatShortSlashDate(event.event_date)}</span>
               </div>
               <div className="flex items-start">
-                <span className="w-44 uppercase">VENUE</span>
-                <span>: {event.venue}</span>
+                <span className="w-48 font-bold shrink-0">VENUE</span>
+                <span className="font-bold">: {event.venue}</span>
               </div>
               <div className="flex items-start">
-                <span className="w-44 uppercase">COORDINATORS</span>
-                <span>: {event.assigned_coordinators.join(", ") || "CSI Coordinators"}</span>
+                <span className="w-48 font-bold shrink-0">COORDINATORS</span>
+                <span className="font-bold">: {event.assigned_coordinators.join(", ") || "CSI Coordinators"}</span>
               </div>
               <div className="flex items-start">
-                <span className="w-44 uppercase">No. of participants</span>
-                <span>: __________________</span>
+                <span className="w-48 font-bold shrink-0">No. of participants</span>
+                <span className="font-bold">: __________________</span>
               </div>
             </div>
 
-            {/* Attendance Roster Table */}
-            <table className="w-full text-xs sm:text-sm text-left border-collapse border border-black">
+            {/* Attendance Roster Table with Proportional Column Widths */}
+            <table className="w-full text-sm text-left border-collapse border border-black table-fixed">
               <thead>
-                <tr className="border-b border-black bg-slate-100 text-black font-extrabold uppercase text-center">
-                  <th className="border border-black py-2 px-2 w-14">SL NO</th>
-                  <th className="border border-black py-2 px-3 text-left">NAME</th>
-                  <th className="border border-black py-2 px-3 w-28">GENDER</th>
-                  <th className="border border-black py-2 px-3 w-28">CLASS</th>
-                  <th className="border border-black py-2 px-3 w-36">SIGNATURE</th>
+                <tr className="border-b border-black text-black font-bold uppercase text-center bg-white">
+                  <th className="border border-black py-2 px-2 w-[10%] text-center">SL NO</th>
+                  <th className="border border-black py-2 px-3 w-[34%] text-left">NAME</th>
+                  <th className="border border-black py-2 px-2 w-[16%] text-center">GENDER</th>
+                  <th className="border border-black py-2 px-2 w-[16%] text-center">CLASS</th>
+                  <th className="border border-black py-2 px-2 w-[24%] text-center">SIGNATURE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black text-black">
                 {[1, 2, 3, 4, 5, 6, 7].map((row) => (
-                  <tr key={row} className="h-8">
-                    <td className="border border-black text-center py-2 px-2 font-mono font-bold">{row}</td>
+                  <tr key={row} className="h-9">
+                    <td className="border border-black text-center py-2 px-2 font-bold">{row}</td>
                     <td className="border border-black py-2 px-3">&nbsp;</td>
-                    <td className="border border-black py-2 px-3">&nbsp;</td>
-                    <td className="border border-black py-2 px-3">&nbsp;</td>
-                    <td className="border border-black py-2 px-3">&nbsp;</td>
+                    <td className="border border-black py-2 px-2">&nbsp;</td>
+                    <td className="border border-black py-2 px-2">&nbsp;</td>
+                    <td className="border border-black py-2 px-2">&nbsp;</td>
                   </tr>
                 ))}
               </tbody>
