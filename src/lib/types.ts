@@ -51,6 +51,11 @@ export interface CSIEvent {
   registration_url?: string;
   bitly_url?: string;
   feedback_url?: string;
+  google_form_url?: string;
+  google_form_edit_url?: string;
+  google_form_id?: string;
   google_sheet_url?: string;
+  google_sheet_id?: string;
+  is_registration_closed?: boolean;
   registered_attendees?: RegisteredAttendee[];
 }

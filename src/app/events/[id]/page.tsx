@@ -25,6 +25,10 @@ import {
   CheckCircle2,
   AlertCircle,
   FileCode,
+  Loader2,
+  RefreshCw,
+  FolderPlus,
+  Check,
 } from "lucide-react";
 import { CSIEvent, RegisteredAttendee } from "@/lib/types";
 import { members } from "@/lib/data";
@@ -71,6 +75,12 @@ export default function EventContainerPage() {
   const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
   const [scriptCopied, setScriptCopied] = useState(false);
 
+  // Google Drive Automated Integration State
+  const [isCreatingFormInDrive, setIsCreatingFormInDrive] = useState(false);
+  const [isTogglingRegistration, setIsTogglingRegistration] = useState(false);
+  const [isSyncingFromDrive, setIsSyncingFromDrive] = useState(false);
+  const [driveActionNotice, setDriveActionNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   // Google Sheet / Registrations Sync State
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [sheetInput, setSheetInput] = useState("");
@@ -84,6 +94,150 @@ export default function EventContainerPage() {
     navigator.clipboard.writeText(eventScriptCode);
     setScriptCopied(true);
     setTimeout(() => setScriptCopied(false), 2500);
+  };
+
+  const handleCreateFormInDrive = async () => {
+    if (!event) return;
+    setIsCreatingFormInDrive(true);
+    setDriveActionNotice(null);
+
+    try {
+      const res = await fetch("/api/google-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_form",
+          eventName: event.event_name,
+          targetDepartments: eventDepartments,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Failed to create form in Google Drive.");
+      }
+
+      const updated: CSIEvent = {
+        ...event,
+        google_form_url: data.formUrl,
+        google_form_edit_url: data.editUrl,
+        google_form_id: data.formId,
+        google_sheet_url: data.sheetUrl,
+        google_sheet_id: data.sheetId,
+        registration_url: data.formUrl,
+        is_registration_closed: false,
+      };
+
+      setEvent(updated);
+      updateEvent(updated);
+      setDriveActionNotice({
+        type: "success",
+        text: "Google Form & Responses Sheet created directly in your CSI Google Drive!",
+      });
+    } catch (err: any) {
+      setDriveActionNotice({
+        type: "error",
+        text: err.message || "Failed to connect to Google Drive Webhook.",
+      });
+    } finally {
+      setIsCreatingFormInDrive(false);
+    }
+  };
+
+  const handleToggleRegistrationStatus = async () => {
+    if (!event) return;
+    const willClose = !event.is_registration_closed;
+    setIsTogglingRegistration(true);
+    setDriveActionNotice(null);
+
+    try {
+      if (willClose && event.google_form_id) {
+        await fetch("/api/google-form", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "close_form",
+            formId: event.google_form_id,
+          }),
+        });
+      }
+
+      const updated: CSIEvent = {
+        ...event,
+        is_registration_closed: willClose,
+      };
+      setEvent(updated);
+      updateEvent(updated);
+      setDriveActionNotice({
+        type: "success",
+        text: willClose
+          ? "Registration closed! You can now sync the final roster into the Attendance Sheet."
+          : "Registration is re-opened.",
+      });
+    } catch (err: any) {
+      setDriveActionNotice({
+        type: "error",
+        text: err.message || "Failed to update registration status.",
+      });
+    } finally {
+      setIsTogglingRegistration(false);
+    }
+  };
+
+  const handleSyncFinalRosterFromDrive = async () => {
+    if (!event) return;
+    setIsSyncingFromDrive(true);
+    setDriveActionNotice(null);
+
+    try {
+      let sheetId = event.google_sheet_id;
+      if (!sheetId && event.google_sheet_url) {
+        const match = event.google_sheet_url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) sheetId = match[1];
+      }
+
+      if (!sheetId) {
+        throw new Error("No Google Sheet ID linked to this event yet. Create the form first or connect your sheet.");
+      }
+
+      const res = await fetch("/api/google-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_responses",
+          sheetId: sheetId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Could not fetch responses from Google Sheet.");
+      }
+
+      const attendees = mapGoogleFormResponsesToAttendance(data.headers || [], data.rows || []);
+      if (attendees.length === 0) {
+        throw new Error("No responses found in the Google Sheet yet.");
+      }
+
+      const updated: CSIEvent = {
+        ...event,
+        registered_attendees: attendees,
+      };
+
+      setEvent(updated);
+      updateEvent(updated);
+      setDriveActionNotice({
+        type: "success",
+        text: `Successfully mapped ${attendees.length} registered students to the Attendance Sheet!`,
+      });
+    } catch (err: any) {
+      setDriveActionNotice({
+        type: "error",
+        text: err.message || "Failed to fetch registrations from Google Sheet.",
+      });
+    } finally {
+      setIsSyncingFromDrive(false);
+    }
   };
 
   const sampleAttendees: RegisteredAttendee[] = [
@@ -219,8 +373,8 @@ export default function EventContainerPage() {
       ? event.target_branches.join(", ")
       : "all";
 
-  const mockRegUrl = `https://forms.gle/csi-${event.id}`;
-  const mockBitlyUrl = `https://bit.ly/csi-${event.event_name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
+  const mockRegUrl = event.google_form_url || `https://forms.gle/csi-${event.id}`;
+  const mockBitlyUrl = event.google_form_url || `https://bit.ly/csi-${event.event_name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
   const mockFeedbackUrl = `https://forms.gle/csi-feedback-${event.id}`;
 
   const facultyCoordinator = "Dr. Tripti C";
@@ -606,20 +760,95 @@ export default function EventContainerPage() {
                   <ExternalLink className="w-5 h-5 text-amber-400" />
                   Line 1: Registration Form
                 </span>
-                {event.registered_attendees && event.registered_attendees.length > 0 ? (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    {event.registered_attendees.length} Synced
-                  </span>
-                ) : (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                    Awaiting Sheet Sync
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {event.google_form_url && (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 text-cyan-400" />
+                      Live in CSI Drive
+                    </span>
+                  )}
+                  {event.is_registration_closed ? (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 font-bold border border-red-500/30">
+                      Registration Closed
+                    </span>
+                  ) : event.google_form_url ? (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      Registration Open
+                    </span>
+                  ) : null}
+                  {event.registered_attendees && event.registered_attendees.length > 0 ? (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      {event.registered_attendees.length} Synced
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                      Awaiting Sheet Sync
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="text-sm text-slate-400 mb-3 leading-relaxed">
                 Automate your official Google Form &amp; Responses Sheet inside your CSI Google Drive, then sync responses directly to the Attendance Sheet.
               </p>
+
+              {/* Status / Drive feedback notice */}
+              {driveActionNotice && (
+                <div
+                  className={`p-3 mb-3 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
+                    driveActionNotice.type === "success"
+                      ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
+                      : "bg-red-950/60 border-red-500/50 text-red-300"
+                  }`}
+                >
+                  {driveActionNotice.type === "success" ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{driveActionNotice.text}</span>
+                </div>
+              )}
+
+              {/* Active Drive Links when Form is Created */}
+              {event.google_form_url && (
+                <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-500/40 space-y-2.5 mb-3 text-xs">
+                  <span className="font-bold text-white block">Connected CSI Drive Assets:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <a
+                      href={event.google_form_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-cyan-300 hover:text-cyan-200 flex items-center gap-1.5 transition font-semibold"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="truncate">Live Student Form</span>
+                    </a>
+                    {event.google_form_edit_url && (
+                      <a
+                        href={event.google_form_edit_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-purple-300 hover:text-purple-200 flex items-center gap-1.5 transition font-semibold"
+                      >
+                        <FileCode className="w-3.5 h-3.5 text-purple-400" />
+                        <span className="truncate">Edit in Forms</span>
+                      </a>
+                    )}
+                    {event.google_sheet_url && (
+                      <a
+                        href={event.google_sheet_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-emerald-300 hover:text-emerald-200 flex items-center gap-1.5 transition font-semibold"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="truncate">Responses Sheet</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Form Questions Overview matching user screenshots */}
               <div className="bg-black p-4 rounded-xl border border-purple-500/30 space-y-2.5 text-xs">
@@ -679,29 +908,91 @@ export default function EventContainerPage() {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between gap-2 flex-wrap">
+            {/* Primary Action Buttons */}
+            <div className="pt-3 border-t border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
+                {/* 1-Click Create Form in Drive */}
+                {!event.google_form_url ? (
+                  <button
+                    onClick={handleCreateFormInDrive}
+                    disabled={isCreatingFormInDrive}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-purple-600 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white text-xs font-extrabold flex items-center gap-2 transition shadow-lg shadow-purple-600/30 disabled:opacity-50"
+                  >
+                    {isCreatingFormInDrive ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Creating Form in CSI Drive...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>Create Form in Drive</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <>
+                    {/* Sync Final Roster after Form Closes */}
+                    <button
+                      onClick={handleSyncFinalRosterFromDrive}
+                      disabled={isSyncingFromDrive}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold flex items-center gap-2 transition shadow-lg shadow-emerald-600/30 disabled:opacity-50"
+                      title="Fetch final responses from Google Sheet into Attendance Sheet"
+                    >
+                      {isSyncingFromDrive ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Fetching Final Roster...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4" />
+                          <span>Sync Final Roster to Attendance</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Toggle Registration Closed / Open */}
+                    <button
+                      onClick={handleToggleRegistrationStatus}
+                      disabled={isTogglingRegistration}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                        event.is_registration_closed
+                          ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600"
+                          : "bg-red-950/60 hover:bg-red-900/80 text-red-200 border-red-500/40"
+                      }`}
+                    >
+                      {isTogglingRegistration ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : null}
+                      <span>{event.is_registration_closed ? "Re-open Form" : "Close Registration"}</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Secondary: Manual Script */}
                 <button
                   onClick={() => setIsScriptModalOpen(true)}
-                  className="px-3.5 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
-                  title="Generate Google Apps Script to run in CSI Drive"
+                  className="px-3 py-1.5 rounded-lg bg-purple-900/40 hover:bg-purple-900/70 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition"
+                  title="View / Copy Google Apps Script code"
                 >
-                  <FileCode className="w-4 h-4 text-purple-400" />
-                  <span>Get Google Apps Script</span>
+                  <FileCode className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Manual Script</span>
                 </button>
 
+                {/* Secondary: Manual Sheet Import */}
                 <button
                   onClick={() => setIsSyncModalOpen(true)}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
-                  title="Import responses from Google Sheet"
+                  className="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 text-xs font-bold flex items-center gap-1.5 transition"
+                  title="Manual Google Sheet URL or paste rows"
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                  <span>Connect Sheet / Import</span>
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Import Data</span>
                 </button>
               </div>
 
               <button
-                onClick={() => copyToClipboard(mockRegUrl, "regUrl")}
+                onClick={() => copyToClipboard(event.google_form_url || mockRegUrl, "regUrl")}
                 className="text-xs text-amber-300 hover:text-white font-bold underline"
               >
                 {copiedSection === "regUrl" ? "Copied Link!" : "Copy Public Link"}
