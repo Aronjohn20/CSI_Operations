@@ -859,33 +859,59 @@ export default function EventContainerPage() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-slate-300 font-mono text-[11px]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-amber-400 font-bold">1.</span> Email *
+                    <span className="text-amber-400 font-bold font-mono">1.</span>
+                    <span className="font-bold text-white">Email</span>
+                    <span className="text-red-400 font-bold">*</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-amber-400 font-bold">2.</span> Title * (Mr / Ms)
+                    <span className="text-amber-400 font-bold font-mono">2.</span>
+                    <span className="font-bold text-white">Title</span>
+                    <span className="text-red-400 font-bold">*</span>
+                    <span className="text-slate-400 text-[11px] font-normal">(Mr / Ms)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-amber-400 font-bold">3.</span> Name *
+                    <span className="text-amber-400 font-bold font-mono">3.</span>
+                    <span className="font-bold text-white">Name</span>
+                    <span className="text-red-400 font-bold">*</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-amber-400 font-bold">4.</span> Rajagiri Email ID *
+                    <span className="text-amber-400 font-bold font-mono">4.</span>
+                    <span className="font-bold text-white">Rajagiri Email ID</span>
+                    <span className="text-red-400 font-bold">*</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-amber-400 font-bold">5.</span> Contact No.(Preferably WhatsApp) *
+                    <span className="text-amber-400 font-bold font-mono">5.</span>
+                    <span className="font-bold text-white">Contact No.(Preferably WhatsApp)</span>
+                    <span className="text-red-400 font-bold">*</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-amber-400 font-bold">6.</span> Year of study * (1st – 4th yr)
+                    <span className="text-amber-400 font-bold font-mono">6.</span>
+                    <span className="font-bold text-white">Year of study</span>
+                    <span className="text-red-400 font-bold">*</span>
+                    <span className="text-slate-400 text-[11px] font-normal">(1st – 4th yr)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-amber-400 font-bold">7.</span> Division * (Alpha - Nil)
+                    <span className="text-amber-400 font-bold font-mono">7.</span>
+                    <span className="font-bold text-white">Department</span>
+                    <span className="text-red-400 font-bold">*</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-amber-400 font-bold">8.</span> Are you a CSI member? *
+                    <span className="text-amber-400 font-bold font-mono">8.</span>
+                    <span className="font-bold text-white">Division</span>
+                    <span className="text-red-400 font-bold">*</span>
+                    <span className="text-slate-400 text-[11px] font-normal">(Alpha - Nil)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-400 font-bold font-mono">9.</span>
+                    <span className="font-bold text-white">Are you a CSI member?</span>
+                    <span className="text-red-400 font-bold">*</span>
                   </div>
                   <div className="flex items-center gap-1.5 col-span-1 sm:col-span-2">
-                    <span className="text-slate-500">9.</span> If yes, enter CSI membership id (Optional)
+                    <span className="text-slate-500 font-bold font-mono">10.</span>
+                    <span className="font-bold text-white">If yes, enter CSI membership id</span>
+                    <span className="text-slate-400 text-[11px] font-normal">(Optional)</span>
                   </div>
                 </div>
 
@@ -969,26 +995,6 @@ export default function EventContainerPage() {
                     </button>
                   </>
                 )}
-
-                {/* Secondary: Manual Script */}
-                <button
-                  onClick={() => setIsScriptModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-purple-900/40 hover:bg-purple-900/70 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition"
-                  title="View / Copy Google Apps Script code"
-                >
-                  <FileCode className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Manual Script</span>
-                </button>
-
-                {/* Secondary: Manual Sheet Import */}
-                <button
-                  onClick={() => setIsSyncModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 text-xs font-bold flex items-center gap-1.5 transition"
-                  title="Manual Google Sheet URL or paste rows"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Import Data</span>
-                </button>
               </div>
 
               <button
