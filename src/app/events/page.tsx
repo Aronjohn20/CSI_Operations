@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, Calendar, Plus, ArrowRight, MapPin, Users } from "lucide-react";
+import { Search, Calendar, Plus, ArrowRight, MapPin, Users, Trash2 } from "lucide-react";
 import { CSIEvent } from "@/lib/types";
-import { getStoredEvents } from "@/lib/eventsStorage";
+import { getStoredEvents, deleteEvent } from "@/lib/eventsStorage";
 import CreateEventModal from "@/components/CreateEventModal";
 
 const statusStyles: Record<string, { text: string; class: string }> = {
@@ -27,6 +27,13 @@ export default function EventsPage() {
     reloadEvents();
   }, []);
 
+  const handleDelete = (id: string, name: string) => {
+    if (window.confirm(`Are you sure you want to delete the event "${name}"?`)) {
+      deleteEvent(id);
+      reloadEvents();
+    }
+  };
+
   const filtered = events.filter((e) => {
     const matchSearch = e.event_name.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "all" || e.status === filterStatus;
@@ -37,7 +44,8 @@ export default function EventsPage() {
     (a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime()
   );
 
-  const testEvent = sorted[0] || null;
+  // Prioritize active/upcoming events (planned or confirmed); fallback to most recent
+  const activeOrUpcomingEvent = sorted.find((e) => e.status !== "completed") || sorted[0] || null;
 
   return (
     <div className="space-y-7 max-w-7xl mx-auto">
@@ -58,51 +66,58 @@ export default function EventsPage() {
         </button>
       </div>
 
-      {/* ACTIVE TEST CONTAINER (SANDBOX) */}
-      {testEvent && (
+      {/* ACTIVE / UPCOMING EVENT CONTAINER */}
+      {activeOrUpcomingEvent && (
         <div className="bg-gradient-to-b from-[#181324] to-[#120F1C] rounded-2xl border border-purple-500/40 p-6 shadow-xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/20 pb-3.5">
             <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-ping"></span>
+              <span className={`w-2.5 h-2.5 rounded-full ${activeOrUpcomingEvent.status !== "completed" ? "bg-green-400 animate-ping" : "bg-purple-400"}`}></span>
               <span className="text-xs font-bold text-purple-200 uppercase tracking-widest bg-purple-950/80 border border-purple-500/40 px-3 py-1 rounded-full">
-                Active Test Container (Sandbox)
+                {activeOrUpcomingEvent.status !== "completed" ? "Active Event Container" : "Latest Event Container"}
               </span>
             </div>
-            <Link
-              href={`/events/${testEvent.id}`}
-              className="text-[17px] font-bold text-purple-300 hover:text-white flex items-center gap-1.5 underline"
-            >
-              <span>Open Full Container View</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/events/${activeOrUpcomingEvent.id}`}
+                className="text-[17px] font-bold text-purple-300 hover:text-white flex items-center gap-1.5 underline"
+              >
+                <span>Open Full Container View</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <button
+                onClick={() => handleDelete(activeOrUpcomingEvent.id, activeOrUpcomingEvent.event_name)}
+                className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition"
+                title="Delete this event"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-3 md:col-span-2">
               <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-xl font-bold text-white">{testEvent.event_name}</h2>
+                <h2 className="text-2xl font-bold text-white">{activeOrUpcomingEvent.event_name}</h2>
                 <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-green-500/20 text-green-300 border border-green-500/40">
-                  {testEvent.mode}
+                  {activeOrUpcomingEvent.mode}
                 </span>
                 <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                  {testEvent.status}
+                  {activeOrUpcomingEvent.status}
                 </span>
               </div>
-              <p className="text-[17px] text-slate-300 leading-relaxed">
-                {testEvent.brief_description || "Event container ready with pre-filled permission letters, notices, and coordinator rosters."}
-              </p>
-              <div className="flex items-center gap-4 text-[17px] text-slate-200 pt-1.5 font-mono flex-wrap">
+              
+              <div className="flex items-center gap-4 text-[17px] text-slate-200 pt-1 font-mono flex-wrap">
                 <span className="flex items-center gap-1.5 text-slate-300">
                   <Calendar className="w-4 h-4 text-purple-400" />
-                  {testEvent.event_date}
+                  {activeOrUpcomingEvent.event_date}
                 </span>
                 <span className="flex items-center gap-1.5 text-slate-300">
                   <MapPin className="w-4 h-4 text-cyan-400" />
-                  {testEvent.venue}
+                  {activeOrUpcomingEvent.venue}
                 </span>
                 <span className="flex items-center gap-1.5 text-slate-300">
                   <Users className="w-4 h-4 text-emerald-400" />
-                  {testEvent.assigned_coordinators.length} Coordinators Assigned
+                  {activeOrUpcomingEvent.assigned_coordinators.length} Coordinators Assigned
                 </span>
               </div>
             </div>
@@ -110,8 +125,8 @@ export default function EventsPage() {
             <div className="bg-black/70 rounded-xl border border-purple-500/30 p-4 space-y-2 flex flex-col justify-center">
               <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">Assigned Coordinators</span>
               <div className="flex flex-wrap gap-1.5">
-                {testEvent.assigned_coordinators.length > 0 ? (
-                  testEvent.assigned_coordinators.map((name) => (
+                {activeOrUpcomingEvent.assigned_coordinators.length > 0 ? (
+                  activeOrUpcomingEvent.assigned_coordinators.map((name) => (
                     <span key={name} className="px-2.5 py-1 rounded-md bg-purple-900/40 border border-purple-500/40 text-xs text-purple-200 font-bold">
                       {name}
                     </span>
@@ -220,13 +235,22 @@ export default function EventsPage() {
                       )}
                     </td>
                     <td className="py-3.5 px-5 text-right">
-                      <Link
-                        href={`/events/${event.id}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 hover:text-white border border-purple-500/40 text-sm font-bold transition shadow-sm"
-                      >
-                        <span>Open Container</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </Link>
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/events/${event.id}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 hover:text-white border border-purple-500/40 text-sm font-bold transition shadow-sm"
+                        >
+                          <span>Open</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(event.id, event.event_name)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
+                          title="Delete Event"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

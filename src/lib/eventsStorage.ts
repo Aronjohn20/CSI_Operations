@@ -66,8 +66,35 @@ export function saveNewEvent(newEvent: Omit<CSIEvent, "id">): CSIEvent {
   return created;
 }
 
+export function deleteEvent(id: string): boolean {
+  if (typeof window === "undefined") return false;
+  const currentEvents = getStoredEvents();
+  const currentMembers = getStoredMembers();
+
+  const toDelete = currentEvents.find((e) => e.id === id);
+  if (!toDelete) return false;
+
+  const filteredEvents = currentEvents.filter((e) => e.id !== id);
+  localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(filteredEvents));
+
+  // Revert (-1) the coordinator assignment counts for coordinators of the deleted event
+  if (toDelete.assigned_coordinators && toDelete.assigned_coordinators.length > 0) {
+    const updatedMembers = currentMembers.map((m) => {
+      if (toDelete.assigned_coordinators.includes(m.name)) {
+        return {
+          ...m,
+          events_coordinated_count: Math.max(0, m.events_coordinated_count - 1),
+        };
+      }
+      return m;
+    });
+    localStorage.setItem(MEMBERS_STORAGE_KEY, JSON.stringify(updatedMembers));
+  }
+
+  return true;
+}
+
 export function getEventById(id: string): CSIEvent | undefined {
   const allEvents = getStoredEvents();
   return allEvents.find((e) => e.id === id);
 }
-

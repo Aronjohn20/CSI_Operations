@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Calendar,
@@ -20,12 +20,14 @@ import {
   Sparkles,
   FileDown,
   Printer,
+  Trash2,
 } from "lucide-react";
 import { CSIEvent } from "@/lib/types";
-import { getStoredEvents } from "@/lib/eventsStorage";
+import { getStoredEvents, deleteEvent } from "@/lib/eventsStorage";
 
 export default function EventContainerPage() {
   const params = useParams();
+  const router = useRouter();
   const eventId = params?.id as string;
 
   const [event, setEvent] = useState<CSIEvent | null>(null);
@@ -36,6 +38,14 @@ export default function EventContainerPage() {
   const [securityAnswer, setSecurityAnswer] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [easterEggError, setEasterEggError] = useState(false);
+
+  const handleDeleteEvent = () => {
+    if (!event) return;
+    if (window.confirm(`Are you sure you want to delete event "${event.event_name}"? This action cannot be undone.`)) {
+      deleteEvent(event.id);
+      router.push("/events");
+    }
+  };
 
   useEffect(() => {
     if (!eventId) return;
@@ -239,8 +249,17 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
           </div>
         </div>
 
-        {/* Easter Egg Trigger */}
-        <div className="flex items-center gap-2">
+        {/* Actions & Easter Egg Trigger */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDeleteEvent}
+            className="px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/30 text-xs font-bold flex items-center gap-1.5 transition"
+            title="Delete this event container"
+          >
+            <Trash2 className="w-4 h-4 text-red-400" />
+            <span>Delete Event</span>
+          </button>
+
           <button
             onClick={() => setIsEasterEggOpen(true)}
             title="System Diagnostics (Secret)"
