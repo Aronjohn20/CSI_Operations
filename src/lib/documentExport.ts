@@ -118,7 +118,8 @@ export function exportAttendancePdf(
   eventTitle: string,
   eventDate: string,
   venue: string,
-  coordinators: string[]
+  coordinators: string[],
+  attendees?: { name: string; gender?: string; class_batch?: string }[]
 ) {
   const doc = new jsPDF({
     orientation: "portrait",
@@ -127,6 +128,7 @@ export function exportAttendancePdf(
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 14;
 
   // Add RSET Logo top-left
@@ -160,24 +162,20 @@ export function exportAttendancePdf(
 
   doc.setFont("helvetica", "bold");
   doc.text("EVENT NAME", col1X, metaY);
-  doc.setFont("helvetica", "bold");
   doc.text(`: ${eventTitle.toUpperCase()}`, col2X, metaY);
 
   doc.text("DATE", col1X, metaY + 6);
-  doc.setFont("helvetica", "bold");
   doc.text(`: ${formatShortSlashDate(eventDate)}`, col2X, metaY + 6);
 
   doc.text("VENUE", col1X, metaY + 12);
-  doc.setFont("helvetica", "bold");
   doc.text(`: ${venue}`, col2X, metaY + 12);
 
   doc.text("COORDINATORS", col1X, metaY + 18);
-  doc.setFont("helvetica", "bold");
   doc.text(`: ${coordinators.join(", ") || "CSI Coordinators"}`, col2X, metaY + 18);
 
+  const participantCountText = attendees && attendees.length > 0 ? String(attendees.length) : "__________________";
   doc.text("No. of participants", col1X, metaY + 24);
-  doc.setFont("helvetica", "bold");
-  doc.text(": __________________", col2X, metaY + 24);
+  doc.text(`: ${participantCountText}`, col2X, metaY + 24);
 
   // Table Structure
   const tableY = metaY + 31;
@@ -185,34 +183,48 @@ export function exportAttendancePdf(
   const colHeaders = ["SL NO", "NAME", "GENDER", "CLASS", "SIGNATURE"];
   const rowHeight = 8.5;
 
-  // Header row
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.3);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  const drawTableHeader = (yPos: number) => {
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
 
-  let curX = margin;
-  doc.rect(margin, tableY, 182, 8);
-  colHeaders.forEach((header, idx) => {
-    if (idx === 0) {
-      doc.text(header, curX + colWidths[idx] / 2, tableY + 5.5, { align: "center" });
-    } else if (idx === 1) {
-      doc.text(header, curX + 4, tableY + 5.5);
-    } else {
-      doc.text(header, curX + colWidths[idx] / 2, tableY + 5.5, { align: "center" });
-    }
-    curX += colWidths[idx];
-    if (idx < colHeaders.length - 1) {
-      doc.line(curX, tableY, curX, tableY + 8);
-    }
-  });
+    let curX = margin;
+    doc.rect(margin, yPos, 182, 8);
+    colHeaders.forEach((header, idx) => {
+      if (idx === 0) {
+        doc.text(header, curX + colWidths[idx] / 2, yPos + 5.5, { align: "center" });
+      } else if (idx === 1) {
+        doc.text(header, curX + 4, yPos + 5.5);
+      } else {
+        doc.text(header, curX + colWidths[idx] / 2, yPos + 5.5, { align: "center" });
+      }
+      curX += colWidths[idx];
+      if (idx < colHeaders.length - 1) {
+        doc.line(curX, yPos, curX, yPos + 8);
+      }
+    });
+  };
 
-  // Data rows (1 to 20)
+  drawTableHeader(tableY);
+
   let curY = tableY + 8;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
 
-  for (let r = 1; r <= 20; r++) {
+  const totalRows = attendees && attendees.length > 0 ? attendees.length : 20;
+
+  for (let r = 1; r <= totalRows; r++) {
+    if (curY + rowHeight > pageHeight - margin) {
+      doc.addPage();
+      curY = margin;
+      drawTableHeader(curY);
+      curY += 8;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+    }
+
+    const att = attendees && attendees[r - 1];
     doc.rect(margin, curY, 182, rowHeight);
     let cellX = margin;
 
@@ -222,14 +234,23 @@ export function exportAttendancePdf(
     doc.line(cellX, curY, cellX, curY + rowHeight);
 
     // Name column
+    if (att?.name) {
+      doc.text(att.name.slice(0, 32), cellX + 3, curY + 5.5);
+    }
     cellX += colWidths[1];
     doc.line(cellX, curY, cellX, curY + rowHeight);
 
     // Gender column
+    if (att?.gender) {
+      doc.text(att.gender, cellX + colWidths[2] / 2, curY + 5.5, { align: "center" });
+    }
     cellX += colWidths[2];
     doc.line(cellX, curY, cellX, curY + rowHeight);
 
     // Class column
+    if (att?.class_batch) {
+      doc.text(att.class_batch, cellX + colWidths[3] / 2, curY + 5.5, { align: "center" });
+    }
     cellX += colWidths[3];
     doc.line(cellX, curY, cellX, curY + rowHeight);
 
@@ -247,20 +268,26 @@ export function exportAttendanceWord(
   eventTitle: string,
   eventDate: string,
   venue: string,
-  coordinators: string[]
+  coordinators: string[],
+  attendees?: { name: string; gender?: string; class_batch?: string }[]
 ) {
   let tableRows = "";
-  for (let i = 1; i <= 20; i++) {
+  const totalRows = attendees && attendees.length > 0 ? attendees.length : 20;
+
+  for (let i = 1; i <= totalRows; i++) {
+    const att = attendees && attendees[i - 1];
     tableRows += `
       <tr>
         <td style="text-align: center; width: 10%; height: 26px;">${i}</td>
-        <td style="width: 34%;">&nbsp;</td>
-        <td style="width: 16%; text-align: center;">&nbsp;</td>
-        <td style="width: 16%; text-align: center;">&nbsp;</td>
+        <td style="width: 34%; padding-left: 6px;">${att ? att.name : "&nbsp;"}</td>
+        <td style="width: 16%; text-align: center;">${att?.gender || "&nbsp;"}</td>
+        <td style="width: 16%; text-align: center;">${att?.class_batch || "&nbsp;"}</td>
         <td style="width: 24%;">&nbsp;</td>
       </tr>
     `;
   }
+
+  const participantCountText = attendees && attendees.length > 0 ? String(attendees.length) : "__________________";
 
   const html = `
     <!-- Top Header Table with Editable Logos -->
@@ -299,7 +326,7 @@ export function exportAttendanceWord(
       </tr>
       <tr style="border: none;">
         <td style="width: 220px; border: none; font-weight: bold; padding: 1.5pt 0; font-size: 13pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">No. of participants</td>
-        <td style="border: none; font-weight: bold; padding: 1.5pt 0; font-size: 13pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">: __________________</td>
+        <td style="border: none; font-weight: bold; padding: 1.5pt 0; font-size: 13pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">: ${participantCountText}</td>
       </tr>
     </table>
 

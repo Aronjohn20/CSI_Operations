@@ -21,10 +21,13 @@ import {
   FileDown,
   Printer,
   Trash2,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
-import { CSIEvent } from "@/lib/types";
+import { CSIEvent, RegisteredAttendee } from "@/lib/types";
 import { members } from "@/lib/data";
-import { getStoredEvents, deleteEvent } from "@/lib/eventsStorage";
+import { getStoredEvents, deleteEvent, updateEvent } from "@/lib/eventsStorage";
 import {
   exportRsmsPdf,
   exportRsmsWord,
@@ -55,6 +58,129 @@ export default function EventContainerPage() {
     if (window.confirm(`Are you sure you want to delete event "${event.event_name}"? This action cannot be undone.`)) {
       deleteEvent(event.id);
       router.push("/events");
+    }
+  };
+
+  // Google Sheet / Registrations Sync State
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [sheetInput, setSheetInput] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
+
+  const sampleAttendees: RegisteredAttendee[] = [
+    { sl_no: 1, name: "LEYAH MARY THOMAS", gender: "Female", class_batch: "S7 CS A" },
+    { sl_no: 2, name: "Safa Nazar", gender: "Female", class_batch: "S7 CSBS" },
+    { sl_no: 3, name: "Neha R Jacob", gender: "Female", class_batch: "S5 CS C" },
+    { sl_no: 4, name: "Naveena Joy", gender: "Female", class_batch: "S5 IT" },
+    { sl_no: 5, name: "Nikitha Rajeev", gender: "Female", class_batch: "S5 AD" },
+    { sl_no: 6, name: "Sarah Elsa Laji", gender: "Female", class_batch: "S3 CS D" },
+    { sl_no: 7, name: "Tessa j kudakassery", gender: "Female", class_batch: "S3 AD" },
+  ];
+
+  const handleApplySampleAttendees = () => {
+    if (!event) return;
+    const updated = {
+      ...event,
+      registered_attendees: sampleAttendees,
+    };
+    setEvent(updated);
+    updateEvent(updated);
+    setSyncStatus({ success: true, message: `Loaded ${sampleAttendees.length} sample attendees from reference scan!` });
+    setTimeout(() => {
+      setIsSyncModalOpen(false);
+      setSyncStatus(null);
+    }, 1200);
+  };
+
+  const handleSyncData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!event || !sheetInput.trim()) return;
+    setIsSyncing(true);
+    setSyncStatus(null);
+
+    try {
+      let rawText = sheetInput.trim();
+
+      // If user pasted a Google Sheet URL, convert to CSV export URL and fetch
+      if (rawText.startsWith("http://") || rawText.startsWith("https://")) {
+        const match = rawText.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          const sheetId = match[1];
+          const csvExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+          try {
+            const res = await fetch(csvExportUrl);
+            if (!res.ok) throw new Error("Could not fetch Google Sheet CSV. Ensure Sheet Sharing is set to 'Anyone with the link can view'.");
+            rawText = await res.text();
+          } catch (fetchErr: any) {
+            throw new Error(fetchErr.message || "Could not access Google Sheet online. Alternatively, copy and paste the sheet rows directly here.");
+          }
+        }
+      }
+
+      // Parse lines
+      const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (lines.length < 2) {
+        throw new Error("Pasted data must include a header row and at least one student row.");
+      }
+
+      const delimiter = lines[0].includes("\t") ? "\t" : ",";
+      const headers = lines[0].split(delimiter).map((h) => h.replace(/^["']|["']$/g, "").trim().toLowerCase());
+
+      const nameIdx = headers.findIndex((h) => h.includes("name"));
+      const genderIdx = headers.findIndex((h) => h.includes("gender") || h.includes("sex"));
+      const classIdx = headers.findIndex((h) => h.includes("class") || h.includes("batch") || h.includes("branch") || h.includes("dept"));
+
+      if (nameIdx === -1) {
+        throw new Error("Header row must contain a column for 'Name' or 'Full Name'.");
+      }
+
+      const attendees: RegisteredAttendee[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(delimiter).map((c) => c.replace(/^["']|["']$/g, "").trim());
+        const name = row[nameIdx];
+        if (!name) continue;
+
+        attendees.push({
+          sl_no: attendees.length + 1,
+          name: name,
+          gender: genderIdx !== -1 && row[genderIdx] ? row[genderIdx] : "",
+          class_batch: classIdx !== -1 && row[classIdx] ? row[classIdx] : "",
+        });
+      }
+
+      if (attendees.length === 0) {
+        throw new Error("No student names could be extracted.");
+      }
+
+      const updated = {
+        ...event,
+        google_sheet_url: sheetInput.startsWith("http") ? sheetInput : event.google_sheet_url,
+        registered_attendees: attendees,
+      };
+      setEvent(updated);
+      updateEvent(updated);
+      setSyncStatus({ success: true, message: `Successfully mapped ${attendees.length} registered students to the Attendance Sheet!` });
+      setTimeout(() => {
+        setIsSyncModalOpen(false);
+        setSyncStatus(null);
+        setSheetInput("");
+      }, 1500);
+    } catch (err: any) {
+      setSyncStatus({ success: false, message: err.message || "Failed to parse registration sheet." });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleClearAttendees = () => {
+    if (!event) return;
+    if (window.confirm("Clear mapped attendees from this attendance sheet?")) {
+      const updated = {
+        ...event,
+        registered_attendees: undefined,
+      };
+      setEvent(updated);
+      updateEvent(updated);
     }
   };
 
@@ -480,32 +606,49 @@ export default function EventContainerPage() {
                   <ExternalLink className="w-5 h-5 text-amber-400" />
                   Line 1: Registration Form
                 </span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                  Ready
-                </span>
+                {event.registered_attendees && event.registered_attendees.length > 0 ? (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    {event.registered_attendees.length} Synced
+                  </span>
+                ) : (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                    Awaiting Sheet Sync
+                  </span>
+                )}
               </div>
               <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                Standardized form schema with mandatory fields (Name, Roll No, Branch, Year, Phone, CSI Membership).
+                Connect the CSI Google Drive responses Sheet to automatically map attendees directly into the Attendance Sheet.
               </p>
               <div className="bg-black p-4 rounded-xl border border-purple-500/30 space-y-3 text-sm">
                 <div className="flex items-center justify-between text-slate-300">
                   <span>Standard College Fields:</span>
-                  <span className="text-white font-mono font-bold">6 Required Questions</span>
+                  <span className="text-white font-mono font-bold">7 Form Questions</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-300">
                   <span>Target Branches:</span>
                   <span className="text-cyan-300 font-bold font-mono">{branchesString}</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-300">
-                  <span>Public Form Link:</span>
-                  <span className="text-cyan-400 font-mono truncate max-w-[200px]">{mockRegUrl}</span>
+                  <span>Attendance Sheet Sync:</span>
+                  <span className="text-emerald-400 font-mono font-bold">
+                    {event.registered_attendees?.length ? `${event.registered_attendees.length} Students Mapped` : "Ready to Link"}
+                  </span>
                 </div>
               </div>
             </div>
-            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between">
+            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between gap-2 flex-wrap">
+              <button
+                onClick={() => setIsSyncModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                <span>Connect Google Sheet / Import</span>
+              </button>
+
               <button
                 onClick={() => copyToClipboard(mockRegUrl, "regUrl")}
-                className="text-sm text-purple-300 hover:text-white font-bold underline"
+                className="text-xs text-purple-300 hover:text-white font-bold underline"
               >
                 {copiedSection === "regUrl" ? "Copied Link!" : "Copy Public Link"}
               </button>
@@ -559,6 +702,15 @@ export default function EventContainerPage() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              {event.registered_attendees && event.registered_attendees.length > 0 && (
+                <button
+                  onClick={handleClearAttendees}
+                  className="px-2.5 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-500/30 text-xs font-bold transition"
+                  title="Clear attendees and revert to blank roster"
+                >
+                  Reset Roster
+                </button>
+              )}
               <button
                 onClick={() =>
                   exportAttendancePdf(
@@ -566,7 +718,8 @@ export default function EventContainerPage() {
                     event.event_name,
                     event.event_date,
                     event.venue,
-                    event.assigned_coordinators
+                    event.assigned_coordinators,
+                    event.registered_attendees
                   )
                 }
                 className="px-3 py-1.5 rounded-lg bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
@@ -582,7 +735,8 @@ export default function EventContainerPage() {
                     event.event_name,
                     event.event_date,
                     event.venue,
-                    event.assigned_coordinators
+                    event.assigned_coordinators,
+                    event.registered_attendees
                   )
                 }
                 className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
@@ -652,7 +806,7 @@ export default function EventContainerPage() {
               </div>
               <div className="flex items-start py-0.5">
                 <span className="w-52 font-bold shrink-0">No. of participants</span>
-                <span className="font-bold">: __________________</span>
+                <span className="font-bold">: {event.registered_attendees && event.registered_attendees.length > 0 ? event.registered_attendees.length : "__________________"}</span>
               </div>
             </div>
 
@@ -668,20 +822,114 @@ export default function EventContainerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-black text-black">
-                {[1, 2, 3, 4, 5, 6, 7].map((row) => (
-                  <tr key={row} className="h-9">
-                    <td className="border border-black text-center py-2 px-2 font-bold">{row}</td>
-                    <td className="border border-black py-2 px-3">&nbsp;</td>
-                    <td className="border border-black py-2 px-2">&nbsp;</td>
-                    <td className="border border-black py-2 px-2">&nbsp;</td>
-                    <td className="border border-black py-2 px-2">&nbsp;</td>
-                  </tr>
-                ))}
+                {(event.registered_attendees && event.registered_attendees.length > 0
+                  ? event.registered_attendees
+                  : [1, 2, 3, 4, 5, 6, 7]
+                ).map((item, idx) => {
+                  const isAttendee = typeof item === "object";
+                  return (
+                    <tr key={idx} className="h-9">
+                      <td className="border border-black text-center py-2 px-2 font-bold">{idx + 1}</td>
+                      <td className="border border-black py-2 px-3 text-left">{isAttendee ? item.name : "\u00A0"}</td>
+                      <td className="border border-black text-center py-2 px-2">{isAttendee ? item.gender || "" : "\u00A0"}</td>
+                      <td className="border border-black text-center py-2 px-2">{isAttendee ? item.class_batch || "" : "\u00A0"}</td>
+                      <td className="border border-black py-2 px-2">&nbsp;</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      {/* GOOGLE SHEET REGISTRATIONS IMPORT MODAL */}
+      {isSyncModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#12101C] border border-purple-500/40 w-full max-w-lg rounded-2xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3">
+              <div className="flex items-center gap-2.5 text-white font-bold text-base">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <span>Connect Google Sheet / Import Registrations</span>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSyncModalOpen(false);
+                  setSyncStatus(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm text-slate-300">
+              <p className="leading-relaxed text-xs text-slate-400">
+                Paste your CSI Drive Google Sheet share link or paste copied table rows (from your CSI Gmail Drive).
+                The system maps <strong>Name</strong>, <strong>Gender</strong>, and <strong>Class</strong> into the Attendance Sheet.
+              </p>
+
+              <form onSubmit={handleSyncData} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 uppercase tracking-wide">
+                    Google Sheet Share Link OR Pasted CSV / TSV Rows
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={sheetInput}
+                    onChange={(e) => setSheetInput(e.target.value)}
+                    placeholder="e.g. https://docs.google.com/spreadsheets/d/.../edit or paste Name, Gender, Class rows..."
+                    className="w-full bg-black border border-purple-500/40 rounded-xl p-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+
+                {syncStatus && (
+                  <div
+                    className={`p-3 rounded-lg text-xs font-bold flex items-center gap-2 border ${
+                      syncStatus.success
+                        ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
+                        : "bg-red-950/60 border-red-500/50 text-red-300"
+                    }`}
+                  >
+                    {syncStatus.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                    <span>{syncStatus.message}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2 gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleApplySampleAttendees}
+                    className="px-3 py-1.5 rounded-lg bg-purple-900/40 hover:bg-purple-900/70 border border-purple-500/40 text-purple-200 text-xs font-bold transition"
+                  >
+                    Quick Test (Load 7 Scan Attendees)
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSyncModalOpen(false);
+                        setSyncStatus(null);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white text-xs font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSyncing || !sheetInput.trim()}
+                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow"
+                    >
+                      {isSyncing ? "Mapping..." : "Sync Attendees"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADMIN EASTER EGG MODAL */}
       {isEasterEggOpen && (

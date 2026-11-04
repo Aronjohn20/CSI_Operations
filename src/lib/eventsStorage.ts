@@ -98,3 +98,16 @@ export function getEventById(id: string): CSIEvent | undefined {
   const allEvents = getStoredEvents();
   return allEvents.find((e) => e.id === id);
 }
+
+export function updateEvent(updatedEvent: CSIEvent): void {
+  const currentEvents = getStoredEvents();
+  const index = currentEvents.findIndex((e) => e.id === updatedEvent.id);
+  if (index !== -1) {
+    currentEvents[index] = updatedEvent;
+  } else {
+    currentEvents.push(updatedEvent);
+  }
+  if (typeof window !== "undefined") {
+    localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(currentEvents));
+  }
+}

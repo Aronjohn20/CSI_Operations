@@ -25,6 +25,15 @@ export interface Member {
   events_coordinated_count: number;
 }
 
+export interface RegisteredAttendee {
+  sl_no?: number;
+  name: string;
+  gender?: string;
+  class_batch?: string;
+  roll_no?: string;
+  email?: string;
+}
+
 export interface CSIEvent {
   id: string;
   event_name: string;
@@ -42,4 +51,6 @@ export interface CSIEvent {
   registration_url?: string;
   bitly_url?: string;
   feedback_url?: string;
+  google_sheet_url?: string;
+  registered_attendees?: RegisteredAttendee[];
 }
