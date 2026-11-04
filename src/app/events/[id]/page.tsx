@@ -631,7 +631,7 @@ export default function EventContainerPage() {
 
             {/* Metadata Grid in Calibri */}
             <div
-              className="space-y-0 text-[16px] text-black mb-5 pl-0.5 leading-snug"
+              className="space-y-0 text-[13px] text-black mb-5 pl-0.5 leading-snug"
               style={{ fontFamily: "'Calibri', 'Segoe UI', Arial, sans-serif" }}
             >
               <div className="flex items-start py-0.5">
