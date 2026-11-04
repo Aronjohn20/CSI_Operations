@@ -630,25 +630,28 @@ export default function EventContainerPage() {
             </div>
 
             {/* Metadata Grid in Calibri */}
-            <div className="space-y-1.5 text-[15px] text-black mb-6 pl-0.5 leading-relaxed">
-              <div className="flex items-start">
-                <span className="w-48 font-bold shrink-0">EVENT NAME</span>
+            <div
+              className="space-y-0 text-[16px] text-black mb-5 pl-0.5 leading-snug"
+              style={{ fontFamily: "'Calibri', 'Segoe UI', Arial, sans-serif" }}
+            >
+              <div className="flex items-start py-0.5">
+                <span className="w-52 font-bold shrink-0">EVENT NAME</span>
                 <span className="font-bold">: {event.event_name.toUpperCase()}</span>
               </div>
-              <div className="flex items-start">
-                <span className="w-48 font-bold shrink-0">DATE</span>
+              <div className="flex items-start py-0.5">
+                <span className="w-52 font-bold shrink-0">DATE</span>
                 <span className="font-bold">: {formatShortSlashDate(event.event_date)}</span>
               </div>
-              <div className="flex items-start">
-                <span className="w-48 font-bold shrink-0">VENUE</span>
+              <div className="flex items-start py-0.5">
+                <span className="w-52 font-bold shrink-0">VENUE</span>
                 <span className="font-bold">: {event.venue}</span>
               </div>
-              <div className="flex items-start">
-                <span className="w-48 font-bold shrink-0">COORDINATORS</span>
+              <div className="flex items-start py-0.5">
+                <span className="w-52 font-bold shrink-0">COORDINATORS</span>
                 <span className="font-bold">: {event.assigned_coordinators.join(", ") || "CSI Coordinators"}</span>
               </div>
-              <div className="flex items-start">
-                <span className="w-48 font-bold shrink-0">No. of participants</span>
+              <div className="flex items-start py-0.5">
+                <span className="w-52 font-bold shrink-0">No. of participants</span>
                 <span className="font-bold">: __________________</span>
               </div>
             </div>

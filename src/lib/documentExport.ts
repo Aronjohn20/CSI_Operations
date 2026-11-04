@@ -280,26 +280,26 @@ export function exportAttendanceWord(
     </table>
 
     <!-- Metadata Block -->
-    <table style="width: 100%; border: none; margin-top: 10px; margin-bottom: 18px; font-family: Calibri, 'Segoe UI', Arial, sans-serif; font-size: 11pt; line-height: 1.6;">
+    <table style="width: 100%; border: none; margin-top: 6pt; margin-bottom: 12pt; border-collapse: collapse; font-family: Calibri, 'Segoe UI', Arial, sans-serif;">
       <tr style="border: none;">
-        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">EVENT NAME</td>
-        <td style="border: none; font-weight: bold; padding: 2px 0;">: ${eventTitle.toUpperCase()}</td>
+        <td style="width: 220px; border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">EVENT NAME</td>
+        <td style="border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">: ${eventTitle.toUpperCase()}</td>
       </tr>
       <tr style="border: none;">
-        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">DATE</td>
-        <td style="border: none; font-weight: bold; padding: 2px 0;">: ${formatShortSlashDate(eventDate)}</td>
+        <td style="width: 220px; border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">DATE</td>
+        <td style="border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">: ${formatShortSlashDate(eventDate)}</td>
       </tr>
       <tr style="border: none;">
-        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">VENUE</td>
-        <td style="border: none; font-weight: bold; padding: 2px 0;">: ${venue}</td>
+        <td style="width: 220px; border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">VENUE</td>
+        <td style="border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">: ${venue}</td>
       </tr>
       <tr style="border: none;">
-        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">COORDINATORS</td>
-        <td style="border: none; font-weight: bold; padding: 2px 0;">: ${coordinators.join(", ") || "CSI Coordinators"}</td>
+        <td style="width: 220px; border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">COORDINATORS</td>
+        <td style="border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">: ${coordinators.join(", ") || "CSI Coordinators"}</td>
       </tr>
       <tr style="border: none;">
-        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">No. of participants</td>
-        <td style="border: none; font-weight: bold; padding: 2px 0;">: __________________</td>
+        <td style="width: 220px; border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">No. of participants</td>
+        <td style="border: none; font-weight: bold; padding: 1.5pt 0; font-size: 16pt; line-height: 1.15; mso-line-height-rule: exactly; font-family: Calibri, sans-serif;">: __________________</td>
       </tr>
     </table>
 
