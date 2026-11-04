@@ -97,7 +97,7 @@ export default function EventContainerPage() {
   const mockBitlyUrl = `https://bit.ly/csi-${event.event_name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
   const mockFeedbackUrl = `https://forms.gle/csi-feedback-${event.id}`;
 
-  const facultyCoordinator = event.faculty_in_charge || "Dr. Tripti C";
+  const facultyCoordinator = "Dr. Tripti C";
   const formattedDateFull = formatFullDateWithDay(event.event_date);
   const timeFormatted = `${event.time_start || "11:35 AM"} – ${event.time_end || "12:30 PM"}`;
   const venueLabel = event.mode === "Online" ? "Platform" : "Venue";
@@ -116,10 +116,8 @@ export default function EventContainerPage() {
       ? event.assigned_coordinators.map(getCoordinatorWithClass)
       : ["CSI Student Coordinators"];
 
-  // RSMS Notice description
-  const rsmsDescription =
-    event.brief_description ||
-    `The Computer Society of India SB RSET, is conducting ${event.mode === "Online" ? "an online coding competition" : "a technical event"}, ${event.event_name}, for students of all years.`;
+  // RSMS Notice description (Standard format from approved template without brief description/impromptu)
+  const rsmsDescription = `The Computer Society of India SB RSET, is conducting ${event.mode === "Online" ? "an online competition" : "a technical event"}, ${event.event_name}, for students of all years.`;
 
   const handleEasterEggUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -451,7 +449,7 @@ export default function EventContainerPage() {
 
                 <p>We kindly request your permission to conduct this event as per the details given below:</p>
 
-                <div className="space-y-1 font-bold pl-2">
+                <div className="space-y-1 font-bold text-left">
                   <p>Event: {event.event_name}</p>
                   <p>Date: {formattedDateFull}</p>
                   <p>Time: {timeFormatted}</p>
