@@ -23,12 +23,17 @@ import {
   Trash2,
 } from "lucide-react";
 import { CSIEvent } from "@/lib/types";
+import { members } from "@/lib/data";
 import { getStoredEvents, deleteEvent } from "@/lib/eventsStorage";
 import {
-  exportToPdf,
-  exportToWord,
+  exportRsmsPdf,
+  exportRsmsWord,
+  exportPermissionPdf,
+  exportPermissionWord,
   exportAttendancePdf,
   exportAttendanceWord,
+  formatFullDateWithDay,
+  formatShortSlashDate,
 } from "@/lib/documentExport";
 
 export default function EventContainerPage() {
@@ -86,56 +91,35 @@ export default function EventContainerPage() {
   const branchesString =
     event.target_branches && event.target_branches.length > 0
       ? event.target_branches.join(", ")
-      : "All Branches";
+      : "all";
 
   const mockRegUrl = `https://forms.gle/csi-${event.id}`;
   const mockBitlyUrl = `https://bit.ly/csi-${event.event_name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
   const mockFeedbackUrl = `https://forms.gle/csi-feedback-${event.id}`;
 
-  // Generated RSMS Notice text
-  const rsmsNoticeText = `*COMPUTER SOCIETY OF INDIA (CSI)*
-Student Branch Chapter
+  const facultyCoordinator = event.faculty_in_charge || "Dr. Tripti C";
+  const formattedDateFull = formatFullDateWithDay(event.event_date);
+  const timeFormatted = `${event.time_start || "11:35 AM"} – ${event.time_end || "12:30 PM"}`;
+  const venueLabel = event.mode === "Online" ? "Platform" : "Venue";
 
-*NOTICE - ${event.event_name.toUpperCase()}*
+  // Map coordinators with class from member database
+  const getCoordinatorWithClass = (name: string) => {
+    const mem = members.find((m) => m.name.toLowerCase() === name.toLowerCase());
+    if (mem && mem.class_batch) {
+      return `${mem.name} (${mem.class_batch})`;
+    }
+    return name;
+  };
 
-Dear Students,
-CSI Student Branch is organizing "${event.event_name}" on ${event.event_date}.
+  const coordinatorListWithClass =
+    event.assigned_coordinators.length > 0
+      ? event.assigned_coordinators.map(getCoordinatorWithClass)
+      : ["CSI Student Coordinators"];
 
-📍 *Venue:* ${event.venue} (${event.mode})
-⏰ *Time:* ${event.time_start || "01:30 PM"} - ${event.time_end || "04:30 PM"}
-🎯 *Eligible Branches:* ${branchesString}
-
-*Brief Overview:*
-${event.brief_description || "Join us for an exciting technical challenge and interactive session."}
-
-🔗 *Register Here:* ${mockBitlyUrl}
-
-*Student Coordinators:*
-${event.assigned_coordinators.length > 0 ? event.assigned_coordinators.map((c) => `• ${c}`).join("\n") : "• CSI Core Team"}
-
-Faculty In-Charge: ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor)"}`;
-
-  // Generated Permission Letter text
-  const permissionLetterText = `To,
-The Head of the Department / Principal
-Subject: Request for permission to conduct "${event.event_name}"
-
-Respected Sir/Madam,
-
-The Computer Society of India (CSI) Student Branch requests official permission to organize "${event.event_name}" on ${event.event_date}.
-
-Event Details:
-- Date: ${event.event_date}
-- Time: ${event.time_start || "01:30 PM"} to ${event.time_end || "04:30 PM"}
-- Mode / Venue: ${event.mode} - ${event.venue}
-- Target Branches: ${branchesString}
-- Expected Attendees: 60-80 students
-- Student Coordinators: ${event.assigned_coordinators.join(", ") || "CSI Executive Committee"}
-
-We request your kind approval for the venue and audio-visual arrangements.
-
-Sincerely,
-${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}`;
+  // RSMS Notice description
+  const rsmsDescription =
+    event.brief_description ||
+    `The Computer Society of India SB RSET, is conducting ${event.mode === "Online" ? "an online coding competition" : "a technical event"}, ${event.event_name}, for students of all years.`;
 
   const handleEasterEggUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -288,23 +272,49 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
           <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 flex flex-col justify-between shadow-xl">
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                <span className="text-sm font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-purple-400" />
-                  Line 4: RSMS Notice (With Bitly Link)
+                <span className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-slate-300" />
+                  Line 4: RSMS Notice (Official Black &amp; White)
                 </span>
 
                 {/* Document Actions */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    onClick={() => exportToPdf(`RSMS_Notice_${event.event_name}`, `RSMS Notice - ${event.event_name}`, rsmsNoticeText)}
-                    className="px-3 py-1.5 rounded-lg bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                    onClick={() =>
+                      exportRsmsPdf(
+                        `RSMS_Notice_${event.event_name}`,
+                        event.event_name,
+                        formattedDateFull,
+                        timeFormatted,
+                        event.venue,
+                        venueLabel,
+                        rsmsDescription,
+                        coordinatorListWithClass,
+                        facultyCoordinator,
+                        mockBitlyUrl
+                      )
+                    }
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 text-xs font-bold flex items-center gap-1.5 transition shadow"
                     title="Direct Download as PDF"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download PDF</span>
                   </button>
                   <button
-                    onClick={() => exportToWord(`RSMS_Notice_${event.event_name}`, `RSMS Notice - ${event.event_name}`, `<pre style="font-family: Calibri, sans-serif; font-size: 11pt; white-space: pre-wrap;">${rsmsNoticeText}</pre>`)}
+                    onClick={() =>
+                      exportRsmsWord(
+                        `RSMS_Notice_${event.event_name}`,
+                        event.event_name,
+                        formattedDateFull,
+                        timeFormatted,
+                        event.venue,
+                        venueLabel,
+                        rsmsDescription,
+                        coordinatorListWithClass,
+                        facultyCoordinator,
+                        mockBitlyUrl
+                      )
+                    }
                     className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
                     title="Direct Download as Word (.doc)"
                   >
@@ -315,17 +325,48 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
               </div>
 
               <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                Pre-formatted notice with coordinator contacts and shortened Bitly registration link.
+                Official clean notification format without colored lines or graphics.
               </p>
 
-              {/* Large 18px font preview in Inter */}
-              <pre className="bg-black p-5 rounded-xl border border-purple-500/40 text-[18px] text-white whitespace-pre-wrap max-h-80 overflow-y-auto leading-relaxed shadow-inner">
-                {rsmsNoticeText}
-              </pre>
+              {/* Exact RSMS Notice Preview (Pure Black/White with Clickable Blue Link) */}
+              <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[17px] leading-relaxed shadow-inner space-y-4 max-h-96 overflow-y-auto">
+                <p className="font-bold underline text-lg tracking-wide">{event.event_name}</p>
+
+                <p className="text-justify leading-relaxed">{rsmsDescription}</p>
+
+                <div className="space-y-1 font-bold">
+                  <p>Date: {formattedDateFull}</p>
+                  <p>Time: {timeFormatted}</p>
+                  <p>{venueLabel}: {event.venue}</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p>Student Coordinators:</p>
+                  <div className="space-y-1 pl-1">
+                    {coordinatorListWithClass.map((c) => (
+                      <p key={c}>{c}</p>
+                    ))}
+                  </div>
+                </div>
+
+                <p>Faculty Coordinator: {facultyCoordinator}</p>
+
+                <p>
+                  Registration Link:{" "}
+                  <a
+                    href={mockBitlyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 underline font-sans font-medium"
+                  >
+                    {mockBitlyUrl}
+                  </a>
+                </p>
+              </div>
             </div>
 
             <div className="pt-3 border-t border-purple-500/20 text-xs text-slate-400">
-              Bitly shortlink embedded: <strong className="text-cyan-300 font-mono">{mockBitlyUrl}</strong>
+              Only clickable link is highlighted in blue • Strict College RSMS Format
             </div>
           </div>
 
@@ -335,13 +376,24 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                 <span className="text-sm font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
                   <FileText className="w-5 h-5 text-cyan-400" />
-                  Line 3: Permission Letter to HOD / Principal
+                  Line 3: Permission Letter to Principal
                 </span>
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    onClick={() => exportToPdf(`Permission_Letter_${event.event_name}`, `Permission Letter - ${event.event_name}`, permissionLetterText)}
+                    onClick={() =>
+                      exportPermissionPdf(
+                        `Permission_Letter_${event.event_name}`,
+                        event.event_name,
+                        formattedDateFull,
+                        timeFormatted,
+                        event.venue,
+                        event.brief_description,
+                        branchesString,
+                        facultyCoordinator
+                      )
+                    }
                     className="px-3 py-1.5 rounded-lg bg-cyan-900/50 hover:bg-cyan-800 text-cyan-200 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
                     title="Direct Download as PDF"
                   >
@@ -349,7 +401,18 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
                     <span>Download PDF</span>
                   </button>
                   <button
-                    onClick={() => exportToWord(`Permission_Letter_${event.event_name}`, `Permission Letter - ${event.event_name}`, `<pre style="font-family: Calibri, sans-serif; font-size: 11pt; white-space: pre-wrap;">${permissionLetterText}</pre>`)}
+                    onClick={() =>
+                      exportPermissionWord(
+                        `Permission_Letter_${event.event_name}`,
+                        event.event_name,
+                        formattedDateFull,
+                        timeFormatted,
+                        event.venue,
+                        event.brief_description,
+                        branchesString,
+                        facultyCoordinator
+                      )
+                    }
                     className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
                     title="Direct Download as Word (.doc)"
                   >
@@ -360,17 +423,54 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
               </div>
 
               <p className="text-sm text-slate-400 mb-3 leading-relaxed">
-                Official formal permission letter dynamically citing dates, venue, and designated coordinators.
+                Formal institutional permission request addressed to The Principal, RSET Kakkanad.
               </p>
 
-              {/* Large 18px font preview in Inter */}
-              <pre className="bg-black p-5 rounded-xl border border-purple-500/40 text-[18px] text-white whitespace-pre-wrap max-h-80 overflow-y-auto leading-relaxed shadow-inner">
-                {permissionLetterText}
-              </pre>
+              {/* Exact Permission Letter Preview */}
+              <div className="bg-black p-6 rounded-xl border border-white/20 text-white font-serif text-[16px] leading-relaxed shadow-inner space-y-3.5 max-h-96 overflow-y-auto">
+                <div className="space-y-0.5">
+                  <p>To</p>
+                  <p>The Principal,</p>
+                  <p>Rajagiri School of Engineering and Technology,</p>
+                  <p>Kakkanad.</p>
+                </div>
+
+                <p className="font-bold pt-1">
+                  Subject: Request for Conducting Technical Event &quot;{event.event_name}&quot;
+                </p>
+
+                <p>Respected Sir,</p>
+
+                <p className="text-justify">
+                  The Computer Society of India (CSI) Student Branch, RSET, is planning to organize a technical event titled <strong>{event.event_name}</strong>. {event.brief_description || "The event is designed to introduce participants to core Computer Science concepts and technical skills through interactive sessions and challenges."}
+                </p>
+
+                <p className="text-justify">
+                  The event is open to students from the <strong>{branchesString}</strong> departments and will be conducted in the <strong>{event.venue}</strong> using a software-based platform developed by the CSI Student Branch.
+                </p>
+
+                <p>We kindly request your permission to conduct this event as per the details given below:</p>
+
+                <div className="space-y-1 font-bold pl-2">
+                  <p>Event: {event.event_name}</p>
+                  <p>Date: {formattedDateFull}</p>
+                  <p>Time: {timeFormatted}</p>
+                  <p>Venue: {event.venue}</p>
+                </div>
+
+                <p>We hope for your kind support and approval for the successful conduct of the event.</p>
+
+                <div className="pt-2 space-y-0.5">
+                  <p>Yours faithfully,</p>
+                  <p className="font-bold pt-3">{facultyCoordinator}</p>
+                  <p>Faculty Coordinator</p>
+                  <p>CSI Student Branch, RSET</p>
+                </div>
+              </div>
             </div>
 
             <div className="pt-3 border-t border-purple-500/20 text-xs text-slate-400">
-              Official KTU / College Management Compliant Letter
+              Strict Official Letterhead Template (Addressed to The Principal)
             </div>
           </div>
 
@@ -448,83 +548,135 @@ ${event.faculty_in_charge || "Dr. Binu A (Faculty Advisor, CSI Student Branch)"}
           </div>
         </div>
 
-        {/* LINE 5: Offline Attendance Sheet */}
-        {event.mode === "Offline" && (
-          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Line 5: Offline Attendance Sheet (Printable)
-                </h3>
-                <p className="text-sm text-slate-400 mt-0.5">
-                  Pre-formatted attendance roster with Event Title, Venue ({event.venue}), Date, and signature columns.
+        {/* LINE 5: Attendance Sheet with Official Header Logos */}
+        <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-5 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Line 5: Attendance Sheet (With RSET &amp; CSI Official Logos)
+              </h3>
+              <p className="text-sm text-slate-400 mt-0.5">
+                Pre-formatted official attendance sheet matching college audit requirements with editable logos.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() =>
+                  exportAttendancePdf(
+                    `Attendance_Sheet_${event.event_name}`,
+                    event.event_name,
+                    event.event_date,
+                    event.venue,
+                    event.assigned_coordinators
+                  )
+                }
+                className="px-3 py-1.5 rounded-lg bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                title="Direct Download Attendance Sheet as PDF"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF</span>
+              </button>
+              <button
+                onClick={() =>
+                  exportAttendanceWord(
+                    `Attendance_Sheet_${event.event_name}`,
+                    event.event_name,
+                    event.event_date,
+                    event.venue,
+                    event.assigned_coordinators
+                  )
+                }
+                className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
+                title="Direct Download Attendance Sheet as Word (.doc)"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                <span>Download Word</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Official Document Sheet Preview (Matches Exact Scanned Format) */}
+          <div className="bg-white text-black p-6 sm:p-8 rounded-xl border border-slate-300 shadow-2xl overflow-x-auto font-sans">
+            {/* Header with Logos */}
+            <div className="flex items-center justify-between border-b-2 border-black pb-4 mb-5 gap-4">
+              <div className="w-20 shrink-0 flex items-center justify-start">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logos/rset_logo.png"
+                  alt="RSET Silver Jubilee Logo"
+                  className="h-20 w-auto object-contain"
+                />
+              </div>
+
+              <div className="text-center flex-1 space-y-1">
+                <h4 className="text-base sm:text-lg font-black tracking-wide uppercase text-black">
+                  COMPUTER SOCIETY OF INDIA SB RSET
+                </h4>
+                <p className="text-sm sm:text-base font-extrabold tracking-wider text-black">
+                  ATTENDANCE SHEET
                 </p>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() =>
-                    exportAttendancePdf(
-                      `Attendance_Sheet_${event.event_name}`,
-                      event.event_name,
-                      event.event_date,
-                      event.venue,
-                      event.assigned_coordinators
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-lg bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
-                  title="Direct Download Attendance Sheet as PDF"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download PDF</span>
-                </button>
-                <button
-                  onClick={() =>
-                    exportAttendanceWord(
-                      `Attendance_Sheet_${event.event_name}`,
-                      event.event_name,
-                      event.event_date,
-                      event.venue,
-                      event.assigned_coordinators
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow"
-                  title="Direct Download Attendance Sheet as Word (.doc)"
-                >
-                  <FileDown className="w-3.5 h-3.5" />
-                  <span>Download Word</span>
-                </button>
+
+              <div className="w-20 shrink-0 flex items-center justify-end">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logos/csi_logo.png"
+                  alt="CSI Official Logo"
+                  className="h-16 w-16 object-contain"
+                />
               </div>
             </div>
 
-            <div className="bg-black p-4 rounded-xl border border-purple-500/30 overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 font-semibold">
-                    <th className="py-2.5 px-3">Sl No</th>
-                    <th className="py-2.5 px-3">Student Name</th>
-                    <th className="py-2.5 px-3">Roll No</th>
-                    <th className="py-2.5 px-3">Branch</th>
-                    <th className="py-2.5 px-3">Forenoon (FN) Sign</th>
-                    <th className="py-2.5 px-3">Afternoon (AN) Sign</th>
-                  </tr>
-                </thead>
-                <tbody className="text-slate-300 divide-y divide-slate-800/60 font-mono">
-                  {[1, 2, 3, 4, 5].map((row) => (
-                    <tr key={row}>
-                      <td className="py-3 px-3">{row}</td>
-                      <td className="py-3 px-3">................................................</td>
-                      <td className="py-3 px-3">....................</td>
-                      <td className="py-3 px-3">....................</td>
-                      <td className="py-3 px-3">__________</td>
-                      <td className="py-3 px-3">__________</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Metadata Grid */}
+            <div className="space-y-1.5 text-sm font-bold text-black mb-6 pl-1 font-mono">
+              <div className="flex items-start">
+                <span className="w-44 uppercase">EVENT NAME</span>
+                <span>: {event.event_name.toUpperCase()}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-44 uppercase">DATE</span>
+                <span>: {formatShortSlashDate(event.event_date)}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-44 uppercase">VENUE</span>
+                <span>: {event.venue}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-44 uppercase">COORDINATORS</span>
+                <span>: {event.assigned_coordinators.join(", ") || "CSI Coordinators"}</span>
+              </div>
+              <div className="flex items-start">
+                <span className="w-44 uppercase">No. of participants</span>
+                <span>: __________________</span>
+              </div>
             </div>
+
+            {/* Attendance Roster Table */}
+            <table className="w-full text-xs sm:text-sm text-left border-collapse border border-black">
+              <thead>
+                <tr className="border-b border-black bg-slate-100 text-black font-extrabold uppercase text-center">
+                  <th className="border border-black py-2 px-2 w-14">SL NO</th>
+                  <th className="border border-black py-2 px-3 text-left">NAME</th>
+                  <th className="border border-black py-2 px-3 w-28">GENDER</th>
+                  <th className="border border-black py-2 px-3 w-28">CLASS</th>
+                  <th className="border border-black py-2 px-3 w-36">SIGNATURE</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black text-black">
+                {[1, 2, 3, 4, 5, 6, 7].map((row) => (
+                  <tr key={row} className="h-8">
+                    <td className="border border-black text-center py-2 px-2 font-mono font-bold">{row}</td>
+                    <td className="border border-black py-2 px-3">&nbsp;</td>
+                    <td className="border border-black py-2 px-3">&nbsp;</td>
+                    <td className="border border-black py-2 px-3">&nbsp;</td>
+                    <td className="border border-black py-2 px-3">&nbsp;</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
       </div>
 
       {/* ADMIN EASTER EGG MODAL */}

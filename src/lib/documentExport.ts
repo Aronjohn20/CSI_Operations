@@ -1,30 +1,97 @@
 import { jsPDF } from "jspdf";
+import { RSET_LOGO_BASE64, CSI_LOGO_BASE64 } from "./logosBase64";
+
+/**
+ * Format date helpers
+ */
+export function formatFullDateWithDay(dateStr: string): string {
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const date = new Date(year, month, day);
+
+      const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const months = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+
+      const daySuffix = (d: number) => {
+        if (d > 3 && d < 21) return "th";
+        switch (d % 10) {
+          case 1: return "st";
+          case 2: return "nd";
+          case 3: return "rd";
+          default: return "th";
+        }
+      };
+
+      const dayOfWeek = daysOfWeek[date.getDay()];
+      const monthName = months[date.getMonth()];
+      return `${day}${daySuffix(day)} ${monthName} ${year} (${dayOfWeek})`;
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
+export function formatShortSlashDate(dateStr: string): string {
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
 
 /**
  * Direct 1-Click Word (.doc) Downloader
- * Generates an MS Word compatible document blob and immediately triggers browser download.
+ * Note: Uses HTML + Office Word XML envelope so MS Word opens it natively
+ * and treats embedded images as full editable pictures.
  */
-export function exportToWord(filename: string, title: string, htmlContent: string) {
+export function exportToWord(filename: string, title: string, htmlBody: string) {
   const fileContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
   <head>
     <meta charset='utf-8'>
     <title>${title}</title>
+    <!--[if gte mso 9]>
+    <xml>
+      <w:WordDocument>
+        <w:View>Print</w:View>
+        <w:Zoom>100</w:Zoom>
+        <w:DoNotOptimizeForBrowser/>
+      </w:WordDocument>
+    </xml>
+    <![endif]-->
     <style>
-      body { font-family: 'Calibri', 'Times New Roman', serif; font-size: 11.5pt; line-height: 1.5; color: #111; margin: 40px; }
-      h2 { color: #1E3A8A; text-align: center; font-size: 16pt; margin-bottom: 4px; }
-      p.subtitle { text-align: center; color: #555; font-size: 10pt; margin-top: 0; margin-bottom: 20px; }
-      hr { border: none; border-top: 1.5px solid #2563EB; margin-bottom: 20px; }
-      pre { font-family: 'Calibri', sans-serif; font-size: 11pt; white-space: pre-wrap; line-height: 1.6; }
-      table { width: 100%; border-collapse: collapse; margin-top: 16px; margin-bottom: 16px; }
-      th, td { border: 1px solid #444; padding: 7px 10px; font-size: 10pt; text-align: left; }
-      th { background-color: #f1f5f9; font-weight: bold; }
+      @page {
+        size: 8.27in 11.69in; /* A4 */
+        margin: 1.0in 1.0in 1.0in 1.0in;
+      }
+      body {
+        font-family: 'Times New Roman', Times, serif;
+        font-size: 12pt;
+        line-height: 1.5;
+        color: #000000;
+      }
+      p { margin: 0 0 10pt 0; }
+      h2, h3 { font-family: 'Times New Roman', Times, serif; color: #000000; }
+      table { border-collapse: collapse; width: 100%; margin-top: 12pt; }
+      th, td { border: 1px solid #000000; padding: 6pt 8pt; font-size: 11pt; text-align: left; }
+      th { font-weight: bold; background-color: #f5f5f5; }
+      a { color: #0000EE; text-decoration: underline; }
+      img { display: inline-block; }
     </style>
   </head>
   <body>
-    <h2>COMPUTER SOCIETY OF INDIA (CSI)</h2>
-    <p class="subtitle">Student Branch Chapter • Official Operations Document</p>
-    <hr />
-    ${htmlContent}
+    ${htmlBody}
   </body>
   </html>`;
 
@@ -42,66 +109,9 @@ export function exportToWord(filename: string, title: string, htmlContent: strin
 }
 
 /**
- * Direct 1-Click PDF Downloader
- * Generates an A4 PDF document client-side and immediately saves to Downloads folder.
- */
-export function exportToPdf(filename: string, title: string, textContent: string) {
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
-
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 18;
-  const contentWidth = pageWidth - margin * 2;
-
-  // Header Banner
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(30, 58, 138); // Royal blue
-  doc.text("COMPUTER SOCIETY OF INDIA (CSI)", pageWidth / 2, 16, { align: "center" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(100, 100, 100);
-  doc.text("Student Branch Chapter • Official Operations Document", pageWidth / 2, 21, { align: "center" });
-
-  // Divider line
-  doc.setDrawColor(37, 99, 235);
-  doc.setLineWidth(0.4);
-  doc.line(margin, 25, pageWidth - margin, 25);
-
-  // Document Title
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(17, 24, 39);
-  doc.text(title.toUpperCase(), margin, 32);
-
-  // Document Body
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(30, 41, 59);
-
-  const lines = doc.splitTextToSize(textContent, contentWidth);
-  let y = 39;
-
-  for (let i = 0; i < lines.length; i++) {
-    if (y > pageHeight - margin) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.text(lines[i], margin, y);
-    y += 5.2;
-  }
-
-  // Save directly to Downloads without print dialog
-  doc.save(`${filename.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
-}
-
-/**
- * Direct Attendance Sheet Exporters (Table Format)
+ * -------------------------------------------------------------
+ * 1. ATTENDANCE SHEET EXPORTERS (With RSET & CSI Logos)
+ * -------------------------------------------------------------
  */
 export function exportAttendancePdf(
   filename: string,
@@ -117,75 +127,117 @@ export function exportAttendancePdf(
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 15;
+  const margin = 14;
 
-  // Header
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(17, 24, 39);
-  doc.text("COMPUTER SOCIETY OF INDIA (CSI)", pageWidth / 2, 15, { align: "center" });
-
-  doc.setFontSize(11);
-  doc.text("STUDENT ATTENDANCE SHEET", pageWidth / 2, 21, { align: "center" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.setTextColor(70, 70, 70);
-  doc.text(`Event: ${eventTitle} | Date: ${eventDate} | Venue: ${venue}`, pageWidth / 2, 27, { align: "center" });
-  if (coordinators.length > 0) {
-    doc.text(`Coordinators: ${coordinators.join(", ")}`, pageWidth / 2, 32, { align: "center" });
+  // Add RSET Logo top-left
+  try {
+    doc.addImage(RSET_LOGO_BASE64, "PNG", margin, 10, 18, 25.5);
+  } catch (e) {
+    console.warn("Could not render RSET logo on PDF", e);
   }
 
-  // Table setup
-  doc.setDrawColor(50, 50, 50);
-  doc.setLineWidth(0.3);
+  // Add CSI Logo top-right
+  try {
+    doc.addImage(CSI_LOGO_BASE64, "PNG", pageWidth - margin - 22, 11, 22, 22);
+  } catch (e) {
+    console.warn("Could not render CSI logo on PDF", e);
+  }
 
-  const startY = 38;
-  const rowHeight = 9.5;
-  const colWidths = [12, 55, 30, 25, 28, 28]; // Total = 178mm
-  const colHeaders = ["Sl", "Student Name", "Roll / Reg No", "Branch", "FN Signature", "AN Signature"];
-
-  let curY = startY;
-
-  // Table Header
-  doc.setFillColor(240, 240, 240);
-  doc.rect(margin, curY, 178, 8, "FD");
+  // Header Titles (Centered between logos)
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
+  doc.text("COMPUTER SOCIETY OF INDIA SB RSET", pageWidth / 2, 19, { align: "center" });
+
+  doc.setFontSize(12);
+  doc.text("ATTENDANCE SHEET", pageWidth / 2, 27, { align: "center" });
+
+  // Metadata block
+  doc.setFontSize(10);
+  const metaY = 42;
+  const col1X = margin;
+  const col2X = margin + 45;
+
+  doc.setFont("helvetica", "bold");
+  doc.text("EVENT NAME", col1X, metaY);
+  doc.setFont("helvetica", "bold");
+  doc.text(`: ${eventTitle.toUpperCase()}`, col2X, metaY);
+
+  doc.text("DATE", col1X, metaY + 6);
+  doc.setFont("helvetica", "bold");
+  doc.text(`: ${formatShortSlashDate(eventDate)}`, col2X, metaY + 6);
+
+  doc.text("VENUE", col1X, metaY + 12);
+  doc.setFont("helvetica", "bold");
+  doc.text(`: ${venue}`, col2X, metaY + 12);
+
+  doc.text("COORDINATORS", col1X, metaY + 18);
+  doc.setFont("helvetica", "bold");
+  doc.text(`: ${coordinators.join(", ") || "CSI Coordinators"}`, col2X, metaY + 18);
+
+  doc.text("No. of participants", col1X, metaY + 24);
+  doc.setFont("helvetica", "bold");
+  doc.text(": __________________", col2X, metaY + 24);
+
+  // Table Structure
+  const tableY = metaY + 31;
+  const colWidths = [15, 65, 30, 30, 42]; // Total = 182mm (Page width 210 - 28 margin)
+  const colHeaders = ["SL NO", "NAME", "GENDER", "CLASS", "SIGNATURE"];
+  const rowHeight = 8.5;
+
+  // Header row
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
 
   let curX = margin;
+  doc.rect(margin, tableY, 182, 8);
   colHeaders.forEach((header, idx) => {
-    doc.text(header, curX + 2, curY + 5.5);
+    if (idx === 0) {
+      doc.text(header, curX + colWidths[idx] / 2, tableY + 5.5, { align: "center" });
+    } else if (idx === 1) {
+      doc.text(header, curX + 4, tableY + 5.5);
+    } else {
+      doc.text(header, curX + colWidths[idx] / 2, tableY + 5.5, { align: "center" });
+    }
     curX += colWidths[idx];
+    if (idx < colHeaders.length - 1) {
+      doc.line(curX, tableY, curX, tableY + 8);
+    }
   });
 
-  curY += 8;
-
-  // Draw 20 blank rows for offline attendance
+  // Data rows (1 to 20)
+  let curY = tableY + 8;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(8.5);
 
   for (let r = 1; r <= 20; r++) {
-    curX = margin;
-    doc.rect(margin, curY, 178, rowHeight);
-    doc.text(String(r), curX + 3, curY + 6.5);
+    doc.rect(margin, curY, 182, rowHeight);
+    let cellX = margin;
 
-    colWidths.forEach((w) => {
-      doc.line(curX, curY, curX, curY + rowHeight);
-      curX += w;
-    });
-    doc.line(curX, curY, curX, curY + rowHeight);
+    // Sl No centered
+    doc.text(String(r), cellX + colWidths[0] / 2, curY + 5.5, { align: "center" });
+    cellX += colWidths[0];
+    doc.line(cellX, curY, cellX, curY + rowHeight);
+
+    // Name column
+    cellX += colWidths[1];
+    doc.line(cellX, curY, cellX, curY + rowHeight);
+
+    // Gender column
+    cellX += colWidths[2];
+    doc.line(cellX, curY, cellX, curY + rowHeight);
+
+    // Class column
+    cellX += colWidths[3];
+    doc.line(cellX, curY, cellX, curY + rowHeight);
+
+    // Signature column
+    cellX += colWidths[4];
 
     curY += rowHeight;
   }
-
-  // Footer notes for faculty verification
-  curY += 8;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text("Coordinators Signature: _______________________", margin, curY);
-  doc.text("Faculty In-Charge Signature: _______________________", 115, curY);
 
   doc.save(`${filename.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
 }
@@ -201,48 +253,350 @@ export function exportAttendanceWord(
   for (let i = 1; i <= 20; i++) {
     tableRows += `
       <tr>
-        <td style="text-align: center; width: 40px;">${i}</td>
-        <td style="width: 220px;">&nbsp;</td>
-        <td style="width: 120px;">&nbsp;</td>
-        <td style="width: 80px;">&nbsp;</td>
-        <td style="width: 100px;">&nbsp;</td>
-        <td style="width: 100px;">&nbsp;</td>
+        <td style="text-align: center; width: 55px; height: 26px;">${i}</td>
+        <td style="width: 250px;">&nbsp;</td>
+        <td style="width: 100px; text-align: center;">&nbsp;</td>
+        <td style="width: 100px; text-align: center;">&nbsp;</td>
+        <td style="width: 140px;">&nbsp;</td>
       </tr>
     `;
   }
 
   const html = `
-    <h3 style="text-align: center; margin-bottom: 2px;">OFFICIAL ATTENDANCE SHEET</h3>
-    <p style="text-align: center; margin-top: 0; font-size: 11pt;">
-      <strong>Event:</strong> ${eventTitle} &nbsp;|&nbsp; 
-      <strong>Date:</strong> ${eventDate} &nbsp;|&nbsp; 
-      <strong>Venue:</strong> ${venue}
-    </p>
-    <p style="text-align: center; font-size: 10pt; color: #444;">
-      <strong>Coordinators:</strong> ${coordinators.join(", ") || "CSI Coordinators"}
-    </p>
+    <!-- Top Header Table with Editable Logos -->
+    <table style="width: 100%; border: none; margin-bottom: 20px;">
+      <tr style="border: none;">
+        <td style="width: 20%; border: none; vertical-align: middle; text-align: left;">
+          <img src="${RSET_LOGO_BASE64}" width="65" height="92" alt="RSET Logo" style="display: inline-block;" />
+        </td>
+        <td style="width: 60%; border: none; vertical-align: middle; text-align: center;">
+          <h3 style="margin: 0; font-size: 13pt; font-weight: bold; text-transform: uppercase;">COMPUTER SOCIETY OF INDIA SB RSET</h3>
+          <p style="margin: 8px 0 0 0; font-size: 12.5pt; font-weight: bold; letter-spacing: 0.5px;">ATTENDANCE SHEET</p>
+        </td>
+        <td style="width: 20%; border: none; vertical-align: middle; text-align: right;">
+          <img src="${CSI_LOGO_BASE64}" width="75" height="75" alt="CSI Logo" style="display: inline-block;" />
+        </td>
+      </tr>
+    </table>
 
-    <table>
+    <!-- Metadata Block -->
+    <table style="width: 100%; border: none; margin-top: 15px; margin-bottom: 18px; font-size: 11pt; line-height: 1.6;">
+      <tr style="border: none;">
+        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">EVENT NAME</td>
+        <td style="border: none; font-weight: bold; padding: 2px 0;">: ${eventTitle.toUpperCase()}</td>
+      </tr>
+      <tr style="border: none;">
+        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">DATE</td>
+        <td style="border: none; font-weight: bold; padding: 2px 0;">: ${formatShortSlashDate(eventDate)}</td>
+      </tr>
+      <tr style="border: none;">
+        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">VENUE</td>
+        <td style="border: none; font-weight: bold; padding: 2px 0;">: ${venue}</td>
+      </tr>
+      <tr style="border: none;">
+        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">COORDINATORS</td>
+        <td style="border: none; font-weight: bold; padding: 2px 0;">: ${coordinators.join(", ") || "CSI Coordinators"}</td>
+      </tr>
+      <tr style="border: none;">
+        <td style="width: 170px; border: none; font-weight: bold; padding: 2px 0;">No. of participants</td>
+        <td style="border: none; font-weight: bold; padding: 2px 0;">: __________________</td>
+      </tr>
+    </table>
+
+    <!-- Attendance Table -->
+    <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000;">
       <thead>
-        <tr>
-          <th style="width: 40px; text-align: center;">Sl</th>
-          <th style="width: 220px;">Student Name</th>
-          <th style="width: 120px;">Roll / Reg No</th>
-          <th style="width: 80px;">Branch</th>
-          <th style="width: 100px; text-align: center;">FN Sign</th>
-          <th style="width: 100px; text-align: center;">AN Sign</th>
+        <tr style="background-color: #ffffff;">
+          <th style="width: 55px; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">SL NO</th>
+          <th style="width: 250px; border: 1px solid #000; text-align: left; padding: 7px 8px; font-size: 10.5pt;">NAME</th>
+          <th style="width: 100px; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">GENDER</th>
+          <th style="width: 100px; border: 1px solid #000; text-align: center; padding: 7px 4px; font-size: 10.5pt;">CLASS</th>
+          <th style="width: 140px; border: 1px solid #000; text-align: center; padding: 7px 6px; font-size: 10.5pt;">SIGNATURE</th>
         </tr>
       </thead>
       <tbody>
         ${tableRows}
       </tbody>
     </table>
-
-    <div style="margin-top: 35px; display: flex; justify-content: space-between;">
-      <p><strong>Student Coordinator Signature:</strong> _______________________</p>
-      <p style="text-align: right;"><strong>Faculty In-Charge Signature:</strong> _______________________</p>
-    </div>
   `;
 
   exportToWord(filename, `Attendance_${eventTitle}`, html);
+}
+
+/**
+ * -------------------------------------------------------------
+ * 2. RSMS NOTICE EXPORTERS (Strictly No Color, No Logos, Blue Link Only)
+ * -------------------------------------------------------------
+ */
+export function exportRsmsPdf(
+  filename: string,
+  eventName: string,
+  eventDateFormatted: string,
+  timeFormatted: string,
+  platformOrVenue: string,
+  venueLabel: string,
+  descriptionText: string,
+  coordinatorsList: string[],
+  facultyCoordinator: string,
+  bitlyUrl: string
+) {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const margin = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const contentWidth = pageWidth - margin * 2;
+
+  let y = 25;
+
+  // Title: Underlined and bold (pure black)
+  doc.setFont("times", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text(eventName, margin, y);
+
+  const titleWidth = doc.getTextWidth(eventName);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y + 1.2, margin + titleWidth, y + 1.2);
+
+  y += 12;
+
+  // Intro Paragraph
+  doc.setFont("times", "normal");
+  doc.setFontSize(11);
+  const introLines = doc.splitTextToSize(descriptionText, contentWidth);
+  doc.text(introLines, margin, y);
+  y += introLines.length * 5.5 + 4;
+
+  // Date, Time, Platform (Bold label, normal value)
+  doc.setFont("times", "bold");
+  doc.text("Date: ", margin, y);
+  const dateLabelWidth = doc.getTextWidth("Date: ");
+  doc.setFont("times", "normal");
+  doc.text(eventDateFormatted, margin + dateLabelWidth, y);
+  y += 5.5;
+
+  doc.setFont("times", "bold");
+  doc.text("Time: ", margin, y);
+  const timeLabelWidth = doc.getTextWidth("Time: ");
+  doc.setFont("times", "normal");
+  doc.text(timeFormatted, margin + timeLabelWidth, y);
+  y += 5.5;
+
+  doc.setFont("times", "bold");
+  doc.text(`${venueLabel}: `, margin, y);
+  const platLabelWidth = doc.getTextWidth(`${venueLabel}: `);
+  doc.setFont("times", "normal");
+  doc.text(platformOrVenue, margin + platLabelWidth, y);
+  y += 10;
+
+  // Student Coordinators
+  doc.setFont("times", "normal");
+  doc.text("Student Coordinators:", margin, y);
+  y += 7;
+
+  coordinatorsList.forEach((c) => {
+    doc.text(c, margin, y);
+    y += 7;
+  });
+
+  y += 3;
+
+  // Faculty Coordinator
+  doc.setFont("times", "normal");
+  doc.text(`Faculty Coordinator: ${facultyCoordinator}`, margin, y);
+  y += 10;
+
+  // Registration Link (Only clickable part is blue)
+  doc.setFont("times", "normal");
+  doc.text("Registration Link: ", margin, y);
+  const regLabelWidth = doc.getTextWidth("Registration Link: ");
+
+  doc.setTextColor(37, 99, 235); // Blue link color
+  doc.textWithLink(bitlyUrl, margin + regLabelWidth, y, { url: bitlyUrl });
+
+  const linkWidth = doc.getTextWidth(bitlyUrl);
+  doc.setDrawColor(37, 99, 235);
+  doc.setLineWidth(0.2);
+  doc.line(margin + regLabelWidth, y + 0.8, margin + regLabelWidth + linkWidth, y + 0.8);
+
+  doc.save(`${filename.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
+}
+
+export function exportRsmsWord(
+  filename: string,
+  eventName: string,
+  eventDateFormatted: string,
+  timeFormatted: string,
+  platformOrVenue: string,
+  venueLabel: string,
+  descriptionText: string,
+  coordinatorsList: string[],
+  facultyCoordinator: string,
+  bitlyUrl: string
+) {
+  const coordinatorsHtml = coordinatorsList
+    .map((c) => `<p style="margin: 0 0 10pt 0;">${c}</p>`)
+    .join("");
+
+  const html = `
+    <p style="margin: 0 0 14pt 0;"><u><strong style="font-size: 13.5pt;">${eventName}</strong></u></p>
+
+    <p style="margin: 0 0 14pt 0; text-align: justify;">${descriptionText}</p>
+
+    <p style="margin: 0 0 4pt 0;"><strong>Date: ${eventDateFormatted}</strong></p>
+    <p style="margin: 0 0 4pt 0;"><strong>Time: ${timeFormatted}</strong></p>
+    <p style="margin: 0 0 14pt 0;"><strong>${venueLabel}: ${platformOrVenue}</strong></p>
+
+    <p style="margin: 0 0 8pt 0;">Student Coordinators:</p>
+    ${coordinatorsHtml}
+
+    <p style="margin: 12pt 0 12pt 0;">Faculty Coordinator: ${facultyCoordinator}</p>
+
+    <p style="margin: 0 0 10pt 0;">Registration Link: <a href="${bitlyUrl}" style="color: #0000EE; text-decoration: underline;">${bitlyUrl}</a></p>
+  `;
+
+  exportToWord(filename, `RSMS_Notice_${eventName}`, html);
+}
+
+/**
+ * -------------------------------------------------------------
+ * 3. PERMISSION LETTER EXPORTERS (Strict Formal Structure, No Logos)
+ * -------------------------------------------------------------
+ */
+export function exportPermissionPdf(
+  filename: string,
+  eventName: string,
+  eventDateFormatted: string,
+  timeFormatted: string,
+  venue: string,
+  briefDescription: string,
+  targetBranchesString: string,
+  facultyCoordinator: string
+) {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const margin = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const contentWidth = pageWidth - margin * 2;
+
+  let y = 25;
+
+  // Header To
+  doc.setFont("times", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0);
+
+  doc.text("To", margin, y); y += 5.5;
+  doc.text("The Principal,", margin, y); y += 5.5;
+  doc.text("Rajagiri School of Engineering and Technology,", margin, y); y += 5.5;
+  doc.text("Kakkanad.", margin, y); y += 10;
+
+  // Subject
+  doc.setFont("times", "bold");
+  const subjectText = `Subject: Request for Conducting Technical Event "${eventName}"`;
+  doc.text(subjectText, margin, y);
+  y += 9;
+
+  // Salutation
+  doc.setFont("times", "normal");
+  doc.text("Respected Sir,", margin, y);
+  y += 7;
+
+  // Body Paragraph 1
+  const p1Text = `The Computer Society of India (CSI) Student Branch, RSET, is planning to organize a technical event titled ${eventName}. ${briefDescription || "The event is designed to introduce participants to core Computer Science concepts such as problem solving, logic, and analytical thinking through interactive challenges."}`;
+  const p1Lines = doc.splitTextToSize(p1Text, contentWidth);
+  doc.text(p1Lines, margin, y);
+  y += p1Lines.length * 5.2 + 5;
+
+  // Body Paragraph 2 (Departments & Venue)
+  const p2Text = `The event is open to students from the ${targetBranchesString} departments and will be conducted in the ${venue} using a software-based platform developed by the CSI Student Branch.`;
+  const p2Lines = doc.splitTextToSize(p2Text, contentWidth);
+  doc.text(p2Lines, margin, y);
+  y += p2Lines.length * 5.2 + 5;
+
+  // Request line
+  const p3Text = "We kindly request your permission to conduct this event as per the details given below:";
+  doc.text(p3Text, margin, y);
+  y += 7;
+
+  // Event Details Block
+  doc.setFont("times", "bold");
+  doc.text(`Event: ${eventName}`, margin, y); y += 5.2;
+  doc.text(`Date: ${eventDateFormatted}`, margin, y); y += 5.2;
+  doc.text(`Time: ${timeFormatted}`, margin, y); y += 5.2;
+  doc.text(`Venue: ${venue}`, margin, y); y += 8;
+
+  // Hope line
+  doc.setFont("times", "normal");
+  const p4Text = "We hope for your kind support and approval for the successful conduct of the event.";
+  doc.text(p4Text, margin, y);
+  y += 10;
+
+  // Sign off
+  doc.text("Yours faithfully,", margin, y);
+  y += 14;
+
+  doc.setFont("times", "bold");
+  doc.text(facultyCoordinator, margin, y); y += 5.2;
+  doc.setFont("times", "normal");
+  doc.text("Faculty Coordinator", margin, y); y += 5.2;
+  doc.text("CSI Student Branch, RSET", margin, y);
+
+  doc.save(`${filename.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
+}
+
+export function exportPermissionWord(
+  filename: string,
+  eventName: string,
+  eventDateFormatted: string,
+  timeFormatted: string,
+  venue: string,
+  briefDescription: string,
+  targetBranchesString: string,
+  facultyCoordinator: string
+) {
+  const html = `
+    <p style="margin: 0 0 3pt 0;">To</p>
+    <p style="margin: 0 0 3pt 0;">The Principal,</p>
+    <p style="margin: 0 0 3pt 0;">Rajagiri School of Engineering and Technology,</p>
+    <p style="margin: 0 0 14pt 0;">Kakkanad.</p>
+
+    <p style="margin: 0 0 12pt 0;"><strong>Subject: Request for Conducting Technical Event "${eventName}"</strong></p>
+
+    <p style="margin: 0 0 10pt 0;">Respected Sir,</p>
+
+    <p style="margin: 0 0 12pt 0; text-align: justify;">
+      The Computer Society of India (CSI) Student Branch, RSET, is planning to organize a technical event titled <strong>${eventName}</strong>. ${briefDescription || "The event is designed to introduce participants to core Computer Science concepts such as problem solving, logic, and analytical thinking through interactive challenges."}
+    </p>
+
+    <p style="margin: 0 0 12pt 0; text-align: justify;">
+      The event is open to students from the <strong>${targetBranchesString}</strong> departments and will be conducted in the <strong>${venue}</strong> using a software-based platform developed by the CSI Student Branch.
+    </p>
+
+    <p style="margin: 0 0 8pt 0;">We kindly request your permission to conduct this event as per the details given below:</p>
+
+    <p style="margin: 0 0 3pt 0;"><strong>Event:</strong> ${eventName}</p>
+    <p style="margin: 0 0 3pt 0;"><strong>Date:</strong> ${eventDateFormatted}</p>
+    <p style="margin: 0 0 3pt 0;"><strong>Time:</strong> ${timeFormatted}</p>
+    <p style="margin: 0 0 12pt 0;"><strong>Venue:</strong> ${venue}</p>
+
+    <p style="margin: 0 0 14pt 0;">We hope for your kind support and approval for the successful conduct of the event.</p>
+
+    <p style="margin: 0 0 18pt 0;">Yours faithfully,</p>
+
+    <p style="margin: 0 0 2pt 0;"><strong>${facultyCoordinator}</strong></p>
+    <p style="margin: 0 0 2pt 0;">Faculty Coordinator</p>
+    <p style="margin: 0 0 0 0;">CSI Student Branch, RSET</p>
+  `;
+
+  exportToWord(filename, `Permission_Letter_${eventName}`, html);
 }
