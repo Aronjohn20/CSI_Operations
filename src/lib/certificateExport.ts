@@ -13,7 +13,27 @@ export interface CertificateInfo {
   facultyCoordinator?: string;
   branchCounselor?: string;
   templateImage?: string; // Optional custom template image (Data URL / base64)
-  customWriteup?: string; // Optional custom writeup text
+}
+
+/**
+ * Exact name formatting algorithm matching the Python certificate generator:
+ * 1. Spacing after dots: re.sub(r'\.(\S)', r'. \1', name)
+ * 2. Title-case capitalize each word part: ' '.join(part.capitalize() for part in formatted_name.split())
+ * 3. Strip all dots: formatted_name.replace('.', '')
+ */
+export function formatCertificateName(name: string): string {
+  if (!name) return "";
+  let formatted = name.trim();
+  // Ensure space after dot if missing (e.g. A.John -> A. John)
+  formatted = formatted.replace(/\.(\S)/g, ". $1");
+  // Capitalize each word part
+  formatted = formatted
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+  // Strip dots
+  formatted = formatted.replace(/\./g, "").trim();
+  return formatted;
 }
 
 export function getWinnerPosition(
@@ -49,6 +69,8 @@ export function getWinnerPosition(
 
 /**
  * Draws an official high-resolution CSI SB RSET Certificate on a jsPDF instance (Landscape A4)
+ * Based on the Python script logic: The only dynamic element is the formatted participant name
+ * stamped onto the selected template!
  */
 export function renderCertificatePage(
   doc: jsPDF,
@@ -64,8 +86,10 @@ export function renderCertificatePage(
   const pageHeight = 210;
   const margin = 14;
   const isWinner = info.position === "1st" || info.position === "2nd" || info.position === "3rd";
+  const formattedName = formatCertificateName(info.attendee.name);
 
-  // If a custom template background image is uploaded, render it full-bleed!
+  // If a custom template background image is uploaded, render it full-bleed
+  // and stamp the dynamic formatted name onto it!
   if (info.templateImage) {
     try {
       doc.addImage(info.templateImage, "PNG", 0, 0, pageWidth, pageHeight);
@@ -73,114 +97,120 @@ export function renderCertificatePage(
       try {
         doc.addImage(info.templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
       } catch (err) {
-        console.warn("Could not draw custom template image, falling back to default theme", err);
+        console.warn("Could not draw custom template image", err);
       }
     }
-  } else {
-    // 1. Certificate Outer Border (Double frame with dark navy / deep purple & gold)
-    doc.setDrawColor(24, 18, 43); // Deep CSI Navy
-    doc.setLineWidth(1.8);
-    doc.rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2);
 
-    doc.setDrawColor(217, 119, 6); // Warm Amber/Gold
-    doc.setLineWidth(0.8);
-    doc.rect(margin + 2.5, margin + 2.5, pageWidth - (margin + 2.5) * 2, pageHeight - (margin + 2.5) * 2);
-
-    // Corner decorative marks
-    const cornerSize = 7;
-    const cInner = margin + 2.5;
-    doc.setFillColor(217, 119, 6);
-    doc.rect(cInner, cInner, cornerSize, 1.2, "F");
-    doc.rect(cInner, cInner, 1.2, cornerSize, "F");
-    doc.rect(pageWidth - cInner - cornerSize, cInner, cornerSize, 1.2, "F");
-    doc.rect(pageWidth - cInner - 1.2, cInner, 1.2, cornerSize, "F");
-    doc.rect(cInner, pageHeight - cInner - 1.2, cornerSize, 1.2, "F");
-    doc.rect(cInner, pageHeight - cInner - cornerSize, 1.2, cornerSize, "F");
-    doc.rect(pageWidth - cInner - cornerSize, pageHeight - cInner - 1.2, cornerSize, 1.2, "F");
-    doc.rect(pageWidth - cInner - 1.2, pageHeight - cInner - cornerSize, 1.2, cornerSize, "F");
-
-    // 2. Logos (RSET on left, CSI on right)
-    try {
-      doc.addImage(RSET_LOGO_BASE64, "PNG", margin + 10, margin + 8, 30, 22);
-    } catch (e) {
-      console.warn("Could not render RSET logo in certificate", e);
-    }
-
-    try {
-      doc.addImage(CSI_LOGO_BASE64, "PNG", pageWidth - margin - 36, margin + 8, 26, 26);
-    } catch (e) {
-      console.warn("Could not render CSI logo in certificate", e);
-    }
-
-    // 3. Header Text
-    let y = margin + 14;
+    // Dynamic replacement of <<name>> on the template:
     doc.setFont("times", "bold");
-    doc.setFontSize(15);
-    doc.setTextColor(24, 18, 43);
-    doc.text(
-      "RAJAGIRI SCHOOL OF ENGINEERING & TECHNOLOGY (AUTONOMOUS)",
-      pageWidth / 2,
-      y,
-      { align: "center" }
-    );
-
-    y += 5.5;
-    doc.setFontSize(12);
-    doc.setTextColor(80, 70, 110);
-    doc.text(
-      "COMPUTER SOCIETY OF INDIA STUDENT BRANCH - RSET",
-      pageWidth / 2,
-      y,
-      { align: "center" }
-    );
-
-    y += 4;
-    doc.setFont("times", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(120, 120, 130);
-    doc.text("Rajagiri Valley, Kakkanad, Kochi, Kerala - 682039", pageWidth / 2, y, { align: "center" });
-
-    // 4. Certificate Badge / Title
-    y += 13;
-    const certTitle = isWinner ? "CERTIFICATE OF APPRECIATION" : "CERTIFICATE OF PARTICIPATION";
-
-    doc.setFont("times", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(isWinner ? 180 : 20, isWinner ? 83 : 20, isWinner ? 9 : 80); // Gold or Deep Navy
-    doc.text(certTitle, pageWidth / 2, y, { align: "center" });
-
-    // Subtitle banner line
-    y += 3;
-    doc.setDrawColor(217, 119, 6);
-    doc.setLineWidth(0.6);
-    doc.line(pageWidth / 2 - 45, y, pageWidth / 2 + 45, y);
+    doc.setFontSize(26);
+    doc.setTextColor(20, 20, 30);
+    doc.text(formattedName, pageWidth / 2, 112, { align: "center" });
+    return;
   }
 
-  // 5. Body Text & Recipient Details
-  let textStartY = info.templateImage ? 86 : margin + 46;
+  // DEFAULT TEMPLATE (When no custom image template is uploaded):
+  // 1. Certificate Outer Border (Double frame with dark navy / deep purple & gold)
+  doc.setDrawColor(24, 18, 43); // Deep CSI Navy
+  doc.setLineWidth(1.8);
+  doc.rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2);
+
+  doc.setDrawColor(217, 119, 6); // Warm Amber/Gold
+  doc.setLineWidth(0.8);
+  doc.rect(margin + 2.5, margin + 2.5, pageWidth - (margin + 2.5) * 2, pageHeight - (margin + 2.5) * 2);
+
+  // Corner decorative marks
+  const cornerSize = 7;
+  const cInner = margin + 2.5;
+  doc.setFillColor(217, 119, 6);
+  doc.rect(cInner, cInner, cornerSize, 1.2, "F");
+  doc.rect(cInner, cInner, 1.2, cornerSize, "F");
+  doc.rect(pageWidth - cInner - cornerSize, cInner, cornerSize, 1.2, "F");
+  doc.rect(pageWidth - cInner - 1.2, cInner, 1.2, cornerSize, "F");
+  doc.rect(cInner, pageHeight - cInner - 1.2, cornerSize, 1.2, "F");
+  doc.rect(cInner, pageHeight - cInner - cornerSize, 1.2, cornerSize, "F");
+  doc.rect(pageWidth - cInner - cornerSize, pageHeight - cInner - 1.2, cornerSize, 1.2, "F");
+  doc.rect(pageWidth - cInner - 1.2, pageHeight - cInner - cornerSize, 1.2, cornerSize, "F");
+
+  // 2. Logos (RSET on left, CSI on right)
+  try {
+    doc.addImage(RSET_LOGO_BASE64, "PNG", margin + 10, margin + 8, 30, 22);
+  } catch (e) {
+    console.warn("Could not render RSET logo in certificate", e);
+  }
+
+  try {
+    doc.addImage(CSI_LOGO_BASE64, "PNG", pageWidth - margin - 36, margin + 8, 26, 26);
+  } catch (e) {
+    console.warn("Could not render CSI logo in certificate", e);
+  }
+
+  // 3. Header Text
+  let y = margin + 14;
+  doc.setFont("times", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(24, 18, 43);
+  doc.text(
+    "RAJAGIRI SCHOOL OF ENGINEERING & TECHNOLOGY (AUTONOMOUS)",
+    pageWidth / 2,
+    y,
+    { align: "center" }
+  );
+
+  y += 5.5;
+  doc.setFontSize(12);
+  doc.setTextColor(80, 70, 110);
+  doc.text(
+    "COMPUTER SOCIETY OF INDIA STUDENT BRANCH - RSET",
+    pageWidth / 2,
+    y,
+    { align: "center" }
+  );
+
+  y += 4;
+  doc.setFont("times", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(120, 120, 130);
+  doc.text("Rajagiri Valley, Kakkanad, Kochi, Kerala - 682039", pageWidth / 2, y, { align: "center" });
+
+  // 4. Certificate Badge / Title
+  y += 13;
+  const certTitle = isWinner ? "CERTIFICATE OF APPRECIATION" : "CERTIFICATE OF PARTICIPATION";
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(isWinner ? 180 : 20, isWinner ? 83 : 20, isWinner ? 9 : 80); // Gold or Deep Navy
+  doc.text(certTitle, pageWidth / 2, y, { align: "center" });
+
+  // Subtitle banner line
+  y += 3;
+  doc.setDrawColor(217, 119, 6);
+  doc.setLineWidth(0.6);
+  doc.line(pageWidth / 2 - 45, y, pageWidth / 2 + 45, y);
+
+  // 5. Body Text & Dynamic Formatted Name
+  let textStartY = margin + 46;
 
   doc.setFont("times", "normal");
   doc.setFontSize(13);
   doc.setTextColor(50, 50, 50);
   doc.text("This is to proudly certify that", pageWidth / 2, textStartY, { align: "center" });
 
-  // Participant Name (Big & Bold)
+  // Dynamic Formatted Participant Name
   textStartY += 10.5;
   doc.setFont("times", "bold");
-  doc.setFontSize(23);
+  doc.setFontSize(24);
   doc.setTextColor(15, 23, 42);
-  const honorific = info.attendee.gender ? `${info.attendee.gender}. ` : "";
-  const participantDisplay = `${honorific}${info.attendee.name.toUpperCase()}`;
-  doc.text(participantDisplay, pageWidth / 2, textStartY, { align: "center" });
+  doc.text(formattedName, pageWidth / 2, textStartY, { align: "center" });
 
   // Name underline
   textStartY += 2.5;
-  const nameWidth = doc.getTextWidth(participantDisplay);
+  const nameWidth = doc.getTextWidth(formattedName);
   doc.setDrawColor(15, 23, 42);
   doc.setLineWidth(0.4);
   doc.line(pageWidth / 2 - nameWidth / 2 - 4, textStartY, pageWidth / 2 + nameWidth / 2 + 4, textStartY);
 
-  // Detail Paragraph / Custom Write-up
+  // Detail Paragraph
   textStartY += 9.5;
   doc.setFont("times", "normal");
   doc.setFontSize(12.5);
@@ -201,44 +231,29 @@ export function renderCertificatePage(
     achievementText = "has actively participated";
   }
 
-  if (info.customWriteup && info.customWriteup.trim()) {
-    // Custom writeup with token replacement
-    let formattedWriteup = info.customWriteup
-      .replace(/{NAME}/g, participantDisplay)
-      .replace(/{EVENT}/g, `"${info.eventName}"`)
-      .replace(/{POSITION}/g, info.position ? `${info.position} Place` : "Participant")
-      .replace(/{DATE}/g, formatFullDateWithDay(info.eventDate))
-      .replace(/{VENUE}/g, info.venue || "RSET");
+  const p1 = `of ${yearStr}${branchStr}${uidStr} ${achievementText} in the technical event`;
+  doc.text(p1, pageWidth / 2, textStartY, { align: "center" });
 
-    const splitText = doc.splitTextToSize(formattedWriteup, 230);
-    doc.text(splitText, pageWidth / 2, textStartY, { align: "center" });
-    textStartY += splitText.length * 6;
-  } else {
-    // Default standard academic write-up
-    const p1 = `of ${yearStr}${branchStr}${uidStr} ${achievementText} in the technical event`;
-    doc.text(p1, pageWidth / 2, textStartY, { align: "center" });
+  textStartY += 7.5;
+  doc.setFont("times", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`"${info.eventName}"`, pageWidth / 2, textStartY, { align: "center" });
 
-    textStartY += 7.5;
-    doc.setFont("times", "bold");
-    doc.setFontSize(15);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`"${info.eventName}"`, pageWidth / 2, textStartY, { align: "center" });
+  textStartY += 7.5;
+  doc.setFont("times", "normal");
+  doc.setFontSize(12);
+  doc.setTextColor(50, 50, 50);
+  const dateFormatted = formatFullDateWithDay(info.eventDate);
+  const venueStr = info.venue ? ` at ${info.venue}` : "";
+  doc.text(
+    `organized by the Computer Society of India (CSI) Student Branch on ${dateFormatted}${venueStr}.`,
+    pageWidth / 2,
+    textStartY,
+    { align: "center" }
+  );
 
-    textStartY += 7.5;
-    doc.setFont("times", "normal");
-    doc.setFontSize(12);
-    doc.setTextColor(50, 50, 50);
-    const dateFormatted = formatFullDateWithDay(info.eventDate);
-    const venueStr = info.venue ? ` at ${info.venue}` : "";
-    doc.text(
-      `organized by the Computer Society of India (CSI) Student Branch on ${dateFormatted}${venueStr}.`,
-      pageWidth / 2,
-      textStartY,
-      { align: "center" }
-    );
-  }
-
-  // 6. Signatures Footer (only if not relying on pre-printed signatures in custom template)
+  // 6. Signatures Footer
   const sigY = pageHeight - margin - 20;
 
   // Left Signature: Branch Counselor
@@ -288,7 +303,7 @@ export function exportSingleCertificatePdf(info: CertificateInfo) {
 
   renderCertificatePage(doc, info, 0, 1);
 
-  const cleanName = info.attendee.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const cleanName = formatCertificateName(info.attendee.name).replace(/[^a-zA-Z0-9_-]/g, "_");
   const cleanEvent = info.eventName.replace(/[^a-zA-Z0-9_-]/g, "_");
   const certType = info.position && info.position !== "participant" ? `Appreciation_${info.position}` : "Participation";
 
@@ -296,56 +311,8 @@ export function exportSingleCertificatePdf(info: CertificateInfo) {
 }
 
 /**
- * Batch exports all certificates into a single consolidated PDF document for printing
- */
-export function exportBatchCertificatesPdf(
-  attendees: FeedbackAttendee[],
-  eventName: string,
-  eventDate: string,
-  venue: string,
-  winners?: {
-    first_place?: string | string[];
-    second_place?: string | string[];
-    third_place?: string | string[];
-  },
-  templateImage?: string,
-  customWriteup?: string,
-  facultyCoordinator?: string
-) {
-  if (!attendees || attendees.length === 0) return;
-
-  const doc = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: "a4",
-  });
-
-  attendees.forEach((att, idx) => {
-    const position = getWinnerPosition(att, winners);
-
-    renderCertificatePage(
-      doc,
-      {
-        attendee: att,
-        eventName,
-        eventDate,
-        venue,
-        position,
-        facultyCoordinator,
-        templateImage,
-        customWriteup,
-      },
-      idx,
-      attendees.length
-    );
-  });
-
-  const cleanEvent = eventName.replace(/[^a-zA-Z0-9_-]/g, "_");
-  doc.save(`All_Certificates_${cleanEvent}.pdf`);
-}
-
-/**
  * Batch exports certificates into two separate ZIP folders (Winners Appreciation vs Participation)
+ * Matches Python output_dir structure: Generates {Formatted_Name}.pdf inside the zip
  */
 export async function exportCertificatesZip(
   type: "winners" | "participation",
@@ -359,7 +326,6 @@ export async function exportCertificatesZip(
     third_place?: string | string[];
   },
   templateImage?: string,
-  customWriteup?: string,
   facultyCoordinator?: string
 ): Promise<number> {
   const zip = new JSZip();
@@ -375,7 +341,7 @@ export async function exportCertificatesZip(
   if (targetAttendees.length === 0) {
     throw new Error(
       type === "winners"
-        ? "No winners selected yet. Please select 1st, 2nd, or 3rd place winners using the selectors above."
+        ? "No winners selected yet. Please select 1st, 2nd, or 3rd place winners."
         : "No participants found in the feedback response list."
     );
   }
@@ -400,24 +366,17 @@ export async function exportCertificatesZip(
         position: pos,
         facultyCoordinator,
         templateImage,
-        customWriteup,
       },
       0,
       1
     );
 
     const pdfData = doc.output("arraybuffer");
-    const safeName = att.name.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const prefix =
-      pos === "1st"
-        ? "1st_Place"
-        : pos === "2nd"
-        ? "2nd_Place"
-        : pos === "3rd"
-        ? "3rd_Place"
-        : "Participation";
-    const fileName = `${prefix}_${safeName}.pdf`;
+    const formattedName = formatCertificateName(att.name);
+    const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
 
+    // Exactly like the python script: {name}.pdf
+    const fileName = `${safeName}.pdf`;
     zip.file(fileName, pdfData);
   }
 
@@ -436,4 +395,51 @@ export async function exportCertificatesZip(
   URL.revokeObjectURL(url);
 
   return targetAttendees.length;
+}
+
+/**
+ * Batch exports all certificates into a single consolidated PDF document
+ */
+export function exportBatchCertificatesPdf(
+  attendees: FeedbackAttendee[],
+  eventName: string,
+  eventDate: string,
+  venue: string,
+  winners?: {
+    first_place?: string | string[];
+    second_place?: string | string[];
+    third_place?: string | string[];
+  },
+  templateImage?: string,
+  facultyCoordinator?: string
+) {
+  if (!attendees || attendees.length === 0) return;
+
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4",
+  });
+
+  attendees.forEach((att, idx) => {
+    const position = getWinnerPosition(att, winners);
+
+    renderCertificatePage(
+      doc,
+      {
+        attendee: att,
+        eventName,
+        eventDate,
+        venue,
+        position,
+        facultyCoordinator,
+        templateImage,
+      },
+      idx,
+      attendees.length
+    );
+  });
+
+  const cleanEvent = eventName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  doc.save(`All_Certificates_${cleanEvent}.pdf`);
 }
