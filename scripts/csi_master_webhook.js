@@ -1,14 +1,15 @@
 /**
  * ============================================================================
  * CSI SB RSET - Master Automation Webhook
- * One-time deployment for all CSI technical events.
+ * One-time deployment for all CSI technical events:
+ * Handles Registration Form, Feedback Form, Drive Linking, and Response Sync.
  * ============================================================================
  */
 
 // Test endpoint to check if webhook is live
 function doGet(e) {
   return ContentService.createTextOutput(
-    JSON.stringify({ status: "online", message: "CSI SB RSET Automation Hub is active." })
+    JSON.stringify({ status: "online", message: "CSI SB RSET Master Webhook Hub is active." })
   ).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -18,21 +19,21 @@ function doPost(e) {
     const data = JSON.parse(e.postData.contents);
     const action = data.action || "create_form";
 
-    // ACTION 1: Create Form & Linked Sheet
+    // -------------------------------------------------------------
+    // ACTION 1: Create Registration Form & Linked Responses Sheet
+    // -------------------------------------------------------------
     if (action === "create_form") {
       const eventName = data.eventName || "CSI Event";
       const targetDepts = data.targetDepartments && data.targetDepartments.length > 0
         ? data.targetDepartments
         : ["AI&DS", "CSBS", "CSE", "IT"];
 
-      // 1. Create Google Form
       const formTitle = eventName + " Registration Form";
       const form = FormApp.create(formTitle);
       form.setCollectEmail(true);
       form.setAllowResponseEdits(false);
       form.setLimitOneResponsePerUser(true);
 
-      // 10 Official CSI RSET Questions:
       // Q1: Title *
       form.addMultipleChoiceItem()
         .setTitle("Title")
@@ -60,7 +61,7 @@ function doPost(e) {
         .setChoiceValues(["1st year", "2nd year", "3rd year", "4th year"])
         .setRequired(true);
 
-      // Q6: Department * (Injected from event's selected branches)
+      // Q6: Department *
       form.addMultipleChoiceItem()
         .setTitle("Department")
         .setChoiceValues(targetDepts)
@@ -84,11 +85,9 @@ function doPost(e) {
         .setHelpText("Your membership ID can be found in your membership card")
         .setRequired(false);
 
-      // 2. Create the Destination Responses Google Sheet in CSI Drive
+      // Create Destination Responses Sheet
       const sheetTitle = eventName + " - Registrations (Responses)";
       const spreadsheet = SpreadsheetApp.create(sheetTitle);
-
-      // 3. Link Form responses to this Sheet
       form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
 
       return ContentService.createTextOutput(JSON.stringify({
@@ -101,8 +100,110 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // ACTION 2: Fetch Final Responses after Form is Closed
-    if (action === "get_responses") {
+    // -------------------------------------------------------------
+    // ACTION 2: Create Feedback Form & Linked Responses Sheet
+    // -------------------------------------------------------------
+    if (action === "create_feedback_form") {
+      const eventName = data.eventName || "CSI Event";
+      const description = data.description || (eventName + " Feedback Survey");
+      const targetDepts = data.targetDepartments && data.targetDepartments.length > 0
+        ? data.targetDepartments
+        : ["AI&DS", "CSBS", "CSE", "IT"];
+      const questions = data.questions || [];
+
+      const formTitle = eventName + " Feedback";
+      const form = FormApp.create(formTitle);
+      form.setDescription(description);
+      form.setCollectEmail(true);
+      form.setAllowResponseEdits(false);
+      form.setLimitOneResponsePerUser(true);
+
+      // SECTION 1: Standard Attendee Profile (First 2 Pages)
+      // Q1: Name (As required in the certificate) *
+      form.addTextItem()
+        .setTitle("Name (As required in the certificate)")
+        .setRequired(true);
+
+      // Q2: UID *
+      form.addTextItem()
+        .setTitle("UID")
+        .setRequired(true);
+
+      // Q3: UID Email (if no then provide your personal email) *
+      form.addTextItem()
+        .setTitle("UID Email (if no then provide your personal email)")
+        .setRequired(true);
+
+      // Q4: Gender *
+      form.addMultipleChoiceItem()
+        .setTitle("Gender")
+        .setChoiceValues(["Mr", "Mrs"])
+        .setRequired(true);
+
+      // Q5: Year of Study *
+      form.addMultipleChoiceItem()
+        .setTitle("Year of Study")
+        .setChoiceValues(["1st", "2nd", "3rd", "4th"])
+        .setRequired(true);
+
+      // Q6: Branch *
+      form.addMultipleChoiceItem()
+        .setTitle("Branch")
+        .setChoiceValues(targetDepts)
+        .setRequired(true);
+
+      // Q7: Section *
+      form.addMultipleChoiceItem()
+        .setTitle("Section")
+        .setChoiceValues(["Alpha", "Beta", "Gamma", "Delta", "Nil"])
+        .setRequired(true);
+
+      // Q8: WhatsApp No *
+      form.addTextItem()
+        .setTitle("WhatsApp No")
+        .setRequired(true);
+
+      // SECTION 2: Event-Specific CO/PO Evaluation
+      const sectionBreak = form.addPageBreakItem();
+      sectionBreak.setTitle("FEEDBACK FORM");
+      sectionBreak.setHelpText("Please evaluate the following criteria based on your experience.");
+
+      if (questions && questions.length > 0) {
+        questions.forEach(function(q) {
+          if (q.type === "paragraph") {
+            form.addParagraphTextItem()
+              .setTitle(q.title)
+              .setHelpText(q.description || "")
+              .setRequired(q.required !== false);
+          } else {
+            form.addMultipleChoiceItem()
+              .setTitle(q.title)
+              .setHelpText(q.description || "")
+              .setChoiceValues(["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"])
+              .setRequired(q.required !== false);
+          }
+        });
+      }
+
+      // Create Destination Responses Sheet
+      const sheetTitle = eventName + " - Feedback (Responses)";
+      const spreadsheet = SpreadsheetApp.create(sheetTitle);
+      form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheet.getId());
+
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        formId: form.getId(),
+        formUrl: form.getPublishedUrl(),
+        editUrl: form.getEditUrl(),
+        sheetUrl: spreadsheet.getUrl(),
+        sheetId: spreadsheet.getId()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // -------------------------------------------------------------
+    // ACTION 3: Fetch Responses from Linked Sheet
+    // -------------------------------------------------------------
+    if (action === "get_responses" || action === "get_feedback_responses") {
       const sheetId = data.sheetId;
       if (!sheetId) throw new Error("No sheetId provided.");
 
@@ -117,17 +218,21 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // ACTION 3: Close Registration Form
+    // -------------------------------------------------------------
+    // ACTION 4: Close / Reopen Form
+    // -------------------------------------------------------------
     if (action === "close_form") {
       const formId = data.formId;
+      const acceptResponses = data.acceptResponses === true;
       if (!formId) throw new Error("No formId provided.");
 
       const form = FormApp.openById(formId);
-      form.setAcceptingResponses(false);
+      form.setAcceptingResponses(acceptResponses);
 
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
-        message: "Form has been closed for registrations."
+        isAccepting: acceptResponses,
+        message: acceptResponses ? "Form is now open for responses." : "Form has been closed for responses."
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -140,4 +245,3 @@ function doPost(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
-

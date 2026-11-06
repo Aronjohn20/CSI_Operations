@@ -34,6 +34,31 @@ export interface RegisteredAttendee {
   email?: string;
 }
 
+export interface FeedbackQuestion {
+  id: string;
+  title: string;
+  description: string;
+  po_mapping: string[]; // e.g. ["PO10", "PO11"]
+  choices: string[];
+  type: "likert_scale" | "paragraph";
+  required: boolean;
+}
+
+export interface FeedbackAttendee {
+  sl_no?: number;
+  name: string; // Name (As required in the certificate)
+  uid?: string; // UID
+  email?: string; // UID Email
+  gender?: string; // Mr / Mrs
+  year_of_study?: string; // 1st, 2nd, 3rd, 4th
+  branch?: string; // CSE, CSBS, IT, AD
+  section?: string; // Alpha, Beta, Gamma, Delta, Nil
+  whatsapp?: string; // WhatsApp No
+  ratings?: Record<string, string>; // { [questionTitle]: rating }
+  comments?: string;
+  submitted_at?: string;
+}
+
 export interface CSIEvent {
   id: string;
   event_name: string;
@@ -58,4 +83,19 @@ export interface CSIEvent {
   google_sheet_id?: string;
   is_registration_closed?: boolean;
   registered_attendees?: RegisteredAttendee[];
+
+  // Feedback Form & Certificate Pipeline additions
+  feedback_google_form_url?: string;
+  feedback_google_form_edit_url?: string;
+  feedback_google_form_id?: string;
+  feedback_google_sheet_url?: string;
+  feedback_google_sheet_id?: string;
+  is_feedback_closed?: boolean;
+  feedback_attendees?: FeedbackAttendee[];
+  winners?: {
+    first_place?: string; // attendee UID or Name
+    second_place?: string;
+    third_place?: string;
+  };
+  custom_feedback_questions?: FeedbackQuestion[];
 }

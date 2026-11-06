@@ -29,8 +29,19 @@ import {
   RefreshCw,
   FolderPlus,
   Check,
+  Trophy,
+  Award,
+  Eye,
+  Sliders,
+  HelpCircle,
+  ChevronDown,
 } from "lucide-react";
-import { CSIEvent, RegisteredAttendee } from "@/lib/types";
+import {
+  CSIEvent,
+  RegisteredAttendee,
+  FeedbackAttendee,
+  FeedbackQuestion,
+} from "@/lib/types";
 import { members } from "@/lib/data";
 import { getStoredEvents, deleteEvent, updateEvent } from "@/lib/eventsStorage";
 import {
@@ -38,6 +49,18 @@ import {
   getDepartmentChoices,
   mapGoogleFormResponsesToAttendance,
 } from "@/lib/formScriptGenerator";
+import {
+  generateDefaultFeedbackQuestions,
+  generateFeedbackGoogleAppsScript,
+  getFeedbackHeaderDescription,
+  mapGoogleSheetToFeedbackAttendees,
+  generateMockFeedbackResponses,
+  PO_DEFINITIONS,
+} from "@/lib/feedbackFormGenerator";
+import {
+  exportSingleCertificatePdf,
+  exportBatchCertificatesPdf,
+} from "@/lib/certificateExport";
 import {
   exportRsmsPdf,
   exportRsmsWord,
@@ -336,6 +359,378 @@ export default function EventContainerPage() {
       setEvent(updated);
       updateEvent(updated);
     }
+  };
+
+  // -------------------------------------------------------------
+  // FEEDBACK FORM & CERTIFICATE PIPELINE STATES
+  // -------------------------------------------------------------
+  const [activeFeedbackQuestions, setActiveFeedbackQuestions] = useState<FeedbackQuestion[]>([]);
+  const [isCreatingFeedbackInDrive, setIsCreatingFeedbackInDrive] = useState(false);
+  const [isTogglingFeedback, setIsTogglingFeedback] = useState(false);
+  const [isSyncingFeedbackFromDrive, setIsSyncingFeedbackFromDrive] = useState(false);
+  const [feedbackActionNotice, setFeedbackActionNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Modals for Feedback
+  const [isFeedbackScriptModalOpen, setIsFeedbackScriptModalOpen] = useState(false);
+  const [feedbackScriptCopied, setFeedbackScriptCopied] = useState(false);
+  const [isFeedbackSyncModalOpen, setIsFeedbackSyncModalOpen] = useState(false);
+  const [feedbackSheetInput, setFeedbackSheetInput] = useState("");
+  const [isFeedbackSyncing, setIsFeedbackSyncing] = useState(false);
+  const [feedbackSyncStatus, setFeedbackSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [isCustomizeQuestionsOpen, setIsCustomizeQuestionsOpen] = useState(false);
+
+  // Certificate Pipeline States
+  const [firstPlaceWinner, setFirstPlaceWinner] = useState<string>("");
+  const [secondPlaceWinner, setSecondPlaceWinner] = useState<string>("");
+  const [thirdPlaceWinner, setThirdPlaceWinner] = useState<string>("");
+  const [previewCertAttendee, setPreviewCertAttendee] = useState<FeedbackAttendee | null>(null);
+  const [previewCertPosition, setPreviewCertPosition] = useState<"1st" | "2nd" | "3rd" | "participant">("participant");
+
+  const feedbackScriptCode = event ? generateFeedbackGoogleAppsScript(event, activeFeedbackQuestions) : "";
+
+  // Initialize feedback questions and saved winners when event loads
+  useEffect(() => {
+    if (event) {
+      if (event.custom_feedback_questions && event.custom_feedback_questions.length > 0) {
+        setActiveFeedbackQuestions(event.custom_feedback_questions);
+      } else {
+        setActiveFeedbackQuestions(generateDefaultFeedbackQuestions(event));
+      }
+      if (event.winners) {
+        setFirstPlaceWinner(event.winners.first_place || "");
+        setSecondPlaceWinner(event.winners.second_place || "");
+        setThirdPlaceWinner(event.winners.third_place || "");
+      }
+    }
+  }, [event?.id]);
+
+  const handleCopyFeedbackScript = () => {
+    navigator.clipboard.writeText(feedbackScriptCode);
+    setFeedbackScriptCopied(true);
+    setTimeout(() => setFeedbackScriptCopied(false), 2500);
+  };
+
+  const handleCreateFeedbackInDrive = async () => {
+    if (!event) return;
+    setIsCreatingFeedbackInDrive(true);
+    setFeedbackActionNotice(null);
+
+    try {
+      const res = await fetch("/api/google-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_feedback_form",
+          eventName: event.event_name,
+          description: getFeedbackHeaderDescription(event),
+          targetDepartments: eventDepartments,
+          questions: activeFeedbackQuestions,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Failed to create feedback form in Google Drive.");
+      }
+
+      const updated: CSIEvent = {
+        ...event,
+        feedback_google_form_url: data.formUrl,
+        feedback_google_form_edit_url: data.editUrl,
+        feedback_google_form_id: data.formId,
+        feedback_google_sheet_url: data.sheetUrl,
+        feedback_google_sheet_id: data.sheetId,
+        feedback_url: data.formUrl,
+        is_feedback_closed: false,
+      };
+
+      setEvent(updated);
+      updateEvent(updated);
+      setFeedbackActionNotice({
+        type: "success",
+        text: "Feedback Form & Responses Sheet created directly in your CSI Google Drive!",
+      });
+    } catch (err: any) {
+      setFeedbackActionNotice({
+        type: "error",
+        text: err.message || "Failed to connect to Google Drive Webhook.",
+      });
+    } finally {
+      setIsCreatingFeedbackInDrive(false);
+    }
+  };
+
+  const handleToggleFeedbackStatus = async () => {
+    if (!event) return;
+    const willClose = !event.is_feedback_closed;
+    setIsTogglingFeedback(true);
+    setFeedbackActionNotice(null);
+
+    try {
+      if (event.feedback_google_form_id) {
+        await fetch("/api/google-form", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "close_form",
+            formId: event.feedback_google_form_id,
+            acceptResponses: !willClose,
+          }),
+        });
+      }
+
+      const updated: CSIEvent = {
+        ...event,
+        is_feedback_closed: willClose,
+      };
+      setEvent(updated);
+      updateEvent(updated);
+      setFeedbackActionNotice({
+        type: "success",
+        text: willClose
+          ? "Feedback Form closed! You can now generate verified certificates from the responses."
+          : "Feedback Form re-opened for responses.",
+      });
+    } catch (err: any) {
+      setFeedbackActionNotice({
+        type: "error",
+        text: err.message || "Failed to update feedback form status.",
+      });
+    } finally {
+      setIsTogglingFeedback(false);
+    }
+  };
+
+  const handleSyncFeedbackFromDrive = async () => {
+    if (!event) return;
+    setIsSyncingFeedbackFromDrive(true);
+    setFeedbackActionNotice(null);
+
+    try {
+      let sheetId = event.feedback_google_sheet_id;
+      if (!sheetId && event.feedback_google_sheet_url) {
+        const match = event.feedback_google_sheet_url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) sheetId = match[1];
+      }
+
+      if (!sheetId) {
+        throw new Error("No Feedback Google Sheet ID linked to this event yet. Create the form first or connect your sheet.");
+      }
+
+      const res = await fetch("/api/google-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_responses",
+          sheetId: sheetId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Could not fetch responses from Feedback Google Sheet.");
+      }
+
+      const attendees = mapGoogleSheetToFeedbackAttendees(data.headers || [], data.rows || []);
+      if (attendees.length === 0) {
+        throw new Error("No responses found in the Feedback Google Sheet yet. Attendees must submit feedback first.");
+      }
+
+      const updated: CSIEvent = {
+        ...event,
+        feedback_attendees: attendees,
+      };
+
+      setEvent(updated);
+      updateEvent(updated);
+      setFeedbackActionNotice({
+        type: "success",
+        text: `Successfully synced ${attendees.length} verified participant(s) into the Certificate Generation Pipeline!`,
+      });
+    } catch (err: any) {
+      setFeedbackActionNotice({
+        type: "error",
+        text: err.message || "Failed to fetch feedback responses from Google Sheet.",
+      });
+    } finally {
+      setIsSyncingFeedbackFromDrive(false);
+    }
+  };
+
+  const handleApplySampleFeedback = () => {
+    if (!event) return;
+    const sampleAttendees = generateMockFeedbackResponses(event);
+    const updated: CSIEvent = {
+      ...event,
+      feedback_attendees: sampleAttendees,
+    };
+    setEvent(updated);
+    updateEvent(updated);
+    setFeedbackSyncStatus({
+      success: true,
+      message: `Loaded ${sampleAttendees.length} sample feedback submissions!`,
+    });
+    setTimeout(() => {
+      setIsFeedbackSyncModalOpen(false);
+      setFeedbackSyncStatus(null);
+    }, 1200);
+  };
+
+  const handleSyncFeedbackData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!event || !feedbackSheetInput.trim()) return;
+    setIsFeedbackSyncing(true);
+    setFeedbackSyncStatus(null);
+
+    try {
+      let rawText = feedbackSheetInput.trim();
+
+      if (rawText.startsWith("http://") || rawText.startsWith("https://")) {
+        const match = rawText.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          const sheetId = match[1];
+          const csvExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+          try {
+            const res = await fetch(csvExportUrl);
+            if (!res.ok) throw new Error("Could not fetch Google Sheet CSV. Ensure Sheet Sharing is set to 'Anyone with the link can view'.");
+            rawText = await res.text();
+          } catch (fetchErr: any) {
+            throw new Error(fetchErr.message || "Could not access Google Sheet online. Alternatively, copy and paste the sheet rows directly.");
+          }
+        }
+      }
+
+      const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (lines.length < 2) {
+        throw new Error("Pasted data must include a header row and at least one student response row.");
+      }
+
+      const delimiter = lines[0].includes("\t") ? "\t" : ",";
+      const headers = lines[0].split(delimiter);
+      const rows = lines.slice(1).map((l) => l.split(delimiter));
+
+      const attendees = mapGoogleSheetToFeedbackAttendees(headers, rows);
+      if (attendees.length === 0) {
+        throw new Error("No student feedback could be extracted.");
+      }
+
+      const updated: CSIEvent = {
+        ...event,
+        feedback_google_sheet_url: feedbackSheetInput.startsWith("http") ? feedbackSheetInput : event.feedback_google_sheet_url,
+        feedback_attendees: attendees,
+      };
+
+      setEvent(updated);
+      updateEvent(updated);
+      setFeedbackSyncStatus({
+        success: true,
+        message: `Successfully mapped ${attendees.length} verified participant(s) into the Certificate Pipeline!`,
+      });
+      setTimeout(() => {
+        setIsFeedbackSyncModalOpen(false);
+        setFeedbackSyncStatus(null);
+        setFeedbackSheetInput("");
+      }, 1500);
+    } catch (err: any) {
+      setFeedbackSyncStatus({
+        success: false,
+        message: err.message || "Failed to parse feedback sheet.",
+      });
+    } finally {
+      setIsFeedbackSyncing(false);
+    }
+  };
+
+  const handleSaveWinners = () => {
+    if (!event) return;
+    const updated: CSIEvent = {
+      ...event,
+      winners: {
+        first_place: firstPlaceWinner || undefined,
+        second_place: secondPlaceWinner || undefined,
+        third_place: thirdPlaceWinner || undefined,
+      },
+    };
+    setEvent(updated);
+    updateEvent(updated);
+    alert("Merit winners saved! Certificates of Excellence can now be generated for 1st, 2nd, and 3rd place.");
+  };
+
+  const handleClearFeedbackAttendees = () => {
+    if (!event) return;
+    if (window.confirm("Clear all synced feedback attendees and reset certificate roster?")) {
+      const updated: CSIEvent = {
+        ...event,
+        feedback_attendees: undefined,
+        winners: undefined,
+      };
+      setFirstPlaceWinner("");
+      setSecondPlaceWinner("");
+      setThirdPlaceWinner("");
+      setEvent(updated);
+      updateEvent(updated);
+    }
+  };
+
+  const handleDownloadSingleCertificate = (att: FeedbackAttendee) => {
+    if (!event) return;
+    let pos: "1st" | "2nd" | "3rd" | "participant" = "participant";
+    if (firstPlaceWinner && (att.uid === firstPlaceWinner || att.name === firstPlaceWinner)) pos = "1st";
+    else if (secondPlaceWinner && (att.uid === secondPlaceWinner || att.name === secondPlaceWinner)) pos = "2nd";
+    else if (thirdPlaceWinner && (att.uid === thirdPlaceWinner || att.name === thirdPlaceWinner)) pos = "3rd";
+
+    exportSingleCertificatePdf({
+      attendee: att,
+      eventName: event.event_name,
+      eventDate: event.event_date,
+      venue: event.venue,
+      position: pos,
+      facultyCoordinator: facultyCoordinator,
+    });
+  };
+
+  const handleDownloadBatchCertificates = () => {
+    if (!event || !event.feedback_attendees || event.feedback_attendees.length === 0) return;
+    exportBatchCertificatesPdf(
+      event.feedback_attendees,
+      event.event_name,
+      event.event_date,
+      event.venue,
+      {
+        first_place: firstPlaceWinner,
+        second_place: secondPlaceWinner,
+        third_place: thirdPlaceWinner,
+      },
+      facultyCoordinator
+    );
+  };
+
+  const handleDownloadMeritCertificates = () => {
+    if (!event || !event.feedback_attendees) return;
+    const meritAttendees = event.feedback_attendees.filter(
+      (att) =>
+        (firstPlaceWinner && (att.uid === firstPlaceWinner || att.name === firstPlaceWinner)) ||
+        (secondPlaceWinner && (att.uid === secondPlaceWinner || att.name === secondPlaceWinner)) ||
+        (thirdPlaceWinner && (att.uid === thirdPlaceWinner || att.name === thirdPlaceWinner))
+    );
+
+    if (meritAttendees.length === 0) {
+      alert("Please select at least one winner (1st, 2nd, or 3rd Place) above first.");
+      return;
+    }
+
+    exportBatchCertificatesPdf(
+      meritAttendees,
+      event.event_name,
+      event.event_date,
+      event.venue,
+      {
+        first_place: firstPlaceWinner,
+        second_place: secondPlaceWinner,
+        third_place: thirdPlaceWinner,
+      },
+      facultyCoordinator
+    );
   };
 
   useEffect(() => {
@@ -985,28 +1380,362 @@ export default function EventContainerPage() {
 
           {/* Feedback Form & QR Code */}
           <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-lg font-bold text-pink-300 tracking-wide flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-pink-400" />
-                Feedback Form &amp; QR Code
-              </span>
-              <button
-                onClick={() => copyToClipboard(mockFeedbackUrl, "feedUrl")}
-                className="text-[16px] text-pink-300 hover:text-white font-bold underline"
-              >
-                {copiedSection === "feedUrl" ? "Copied URL!" : "Copy Feedback URL"}
-              </button>
+            <div>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <span className="text-lg font-bold text-pink-300 tracking-wide flex items-center gap-2">
+                  <QrCode className="w-5 h-5 text-pink-400" />
+                  Feedback Form &amp; QR Code
+                </span>
+                <div className="flex items-center gap-2">
+                  {event.feedback_google_form_url && (
+                    <span className="text-[14px] px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 flex items-center gap-1.5">
+                      <Check className="w-4 h-4 text-cyan-400" />
+                      Live in CSI Drive
+                    </span>
+                  )}
+                  {event.is_feedback_closed ? (
+                    <span className="text-[14px] px-3 py-1 rounded-full bg-red-500/20 text-red-300 font-bold border border-red-500/30">
+                      Feedback Closed
+                    </span>
+                  ) : event.feedback_google_form_url ? (
+                    <span className="text-[14px] px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      Feedback Open
+                    </span>
+                  ) : null}
+                  {event.feedback_attendees && event.feedback_attendees.length > 0 ? (
+                    <span className="text-[14px] px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      {event.feedback_attendees.length} Verified for Certificates
+                    </span>
+                  ) : (
+                    <span className="text-[14px] px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                      Awaiting Feedback Sync
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Notice */}
+              {feedbackActionNotice && (
+                <div
+                  className={`p-3.5 mb-3 rounded-xl text-[15px] font-semibold flex items-center gap-2.5 border ${
+                    feedbackActionNotice.type === "success"
+                      ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
+                      : "bg-red-950/60 border-red-500/50 text-red-300"
+                  }`}
+                >
+                  {feedbackActionNotice.type === "success" ? (
+                    <CheckCircle2 className="w-5 h-5 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                  )}
+                  <span>{feedbackActionNotice.text}</span>
+                </div>
+              )}
+
+              {/* Connected Drive Assets */}
+              {event.feedback_google_form_url && (
+                <div className="p-4 rounded-xl bg-purple-950/40 border border-purple-500/40 space-y-3 mb-3 text-[15px]">
+                  <span className="font-bold text-white block">Connected CSI Drive Feedback Assets:</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <a
+                      href={event.feedback_google_form_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-3 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-cyan-300 hover:text-cyan-200 flex items-center gap-2 transition font-semibold"
+                    >
+                      <ExternalLink className="w-4 h-4 text-cyan-400" />
+                      <span className="truncate">Live Feedback Form</span>
+                    </a>
+                    {event.feedback_google_form_edit_url && (
+                      <a
+                        href={event.feedback_google_form_edit_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-3 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-purple-300 hover:text-purple-200 flex items-center gap-2 transition font-semibold"
+                      >
+                        <FileCode className="w-4 h-4 text-purple-400" />
+                        <span className="truncate">Edit in Forms</span>
+                      </a>
+                    )}
+                    {event.feedback_google_sheet_url && (
+                      <a
+                        href={event.feedback_google_sheet_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-3 rounded-lg bg-black/60 hover:bg-black border border-purple-500/30 text-emerald-300 hover:text-emerald-200 flex items-center gap-2 transition font-semibold"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                        <span className="truncate">Responses Sheet</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Form Overview Matching Exact User Format */}
+              <div className="bg-black p-5 rounded-xl border border-purple-500/30 space-y-5">
+                {/* Form Title & Description Header (Section 1 Header) */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-purple-950/50 to-pink-950/40 border border-pink-500/30 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h4 className="text-xl font-bold text-white tracking-wide">
+                      {event.event_name} Feedback
+                    </h4>
+                    <span className="text-xs px-2.5 py-1 rounded bg-pink-500/20 text-pink-300 font-mono font-bold">
+                      Section 1 of 2
+                    </span>
+                  </div>
+                  <p className="text-[17px] text-slate-300 whitespace-pre-line leading-relaxed">
+                    {getFeedbackHeaderDescription(event)}
+                  </p>
+                </div>
+
+                {/* Section 1: Standard Attendee Profile (First 2 Pages) */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
+                    <span className="font-bold text-slate-200 text-[17px]">
+                      Standard Attendee Profile (8 Fields - Fixed College Format):
+                    </span>
+                    <span className="text-[14px] px-3 py-1 rounded bg-amber-500/20 text-amber-300 font-mono font-semibold">
+                      All 8 Required for Certificate Verification
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-[17px]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">1.</span>
+                      <span className="font-bold text-white">Name (As required in the certificate)</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">2.</span>
+                      <span className="font-bold text-white">UID</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">3.</span>
+                      <span className="font-bold text-white">UID Email</span>
+                      <span className="text-red-400 font-bold">*</span>
+                      <span className="text-slate-400 text-[15px] font-normal">(if no then provide your personal email)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">4.</span>
+                      <span className="font-bold text-white">Gender</span>
+                      <span className="text-red-400 font-bold">*</span>
+                      <span className="text-slate-400 text-[15px] font-normal">(Mr / Mrs)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">5.</span>
+                      <span className="font-bold text-white">Year of Study</span>
+                      <span className="text-red-400 font-bold">*</span>
+                      <span className="text-slate-400 text-[15px] font-normal">(1st, 2nd, 3rd, 4th)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">6.</span>
+                      <span className="font-bold text-white">Branch</span>
+                      <span className="text-red-400 font-bold">*</span>
+                      <span className="text-cyan-300 text-[15px] font-mono">({eventDepartments.join(", ")})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">7.</span>
+                      <span className="font-bold text-white">Section</span>
+                      <span className="text-red-400 font-bold">*</span>
+                      <span className="text-slate-400 text-[15px] font-normal">(Alpha, Beta, Gamma, Delta, Nil)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">8.</span>
+                      <span className="font-bold text-white">WhatsApp No</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Event-Specific CO/PO Evaluation (FEEDBACK FORM) */}
+                <div className="pt-4 border-t border-purple-500/20 space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-purple-500/20 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-200 text-[17px]">
+                        Section 2 of 2: FEEDBACK FORM (Event-Specific CO / PO Evaluation)
+                      </span>
+                      <span className="text-[13px] px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono font-semibold">
+                        NBA / AICTE Criteria
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setIsCustomizeQuestionsOpen(true)}
+                      className="px-3 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition"
+                    >
+                      <Sliders className="w-3.5 h-3.5 text-purple-300" />
+                      <span>Customize CO/PO Questions</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {activeFeedbackQuestions.map((q, idx) => (
+                      <div
+                        key={q.id || idx}
+                        className="p-4 rounded-xl bg-slate-950/80 border border-purple-500/20 space-y-2 text-[17px]"
+                      >
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-amber-400 font-bold font-mono">{idx + 1}.</span>
+                            <span className="font-bold text-white">{q.title}</span>
+                            <span className="text-red-400 font-bold">*</span>
+                          </div>
+                          {q.po_mapping && q.po_mapping.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              {q.po_mapping.map((po) => (
+                                <span
+                                  key={po}
+                                  className="px-2.5 py-0.5 rounded text-xs font-bold font-mono bg-cyan-950 text-cyan-300 border border-cyan-500/40"
+                                  title={PO_DEFINITIONS[po]?.title || po}
+                                >
+                                  {po}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <p className="text-slate-300 text-[16px] leading-relaxed pl-5">
+                          {q.description}
+                        </p>
+
+                        {q.type === "likert_scale" ? (
+                          <div className="pl-5 pt-2 flex flex-wrap gap-2 sm:gap-4 text-xs font-semibold text-slate-400">
+                            {["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"].map((opt) => (
+                              <label key={opt} className="flex items-center gap-1.5 cursor-default">
+                                <span className="w-3.5 h-3.5 rounded-full border border-slate-500 inline-block" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="pl-5 pt-2">
+                            <div className="p-2.5 rounded-lg bg-black border border-white/10 text-xs text-slate-500 italic">
+                              [Long answer text (Paragraph response)]
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Projector Display Ready QR Code */}
+                <div className="pt-4 border-t border-purple-500/20">
+                  <div className="flex flex-col sm:flex-row items-center gap-6 bg-slate-950 p-5 rounded-xl border border-pink-500/30">
+                    <div className="w-28 h-28 bg-white p-2 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
+                      <QrCode className="w-24 h-24 text-black" />
+                    </div>
+                    <div className="space-y-2 text-center sm:text-left flex-1">
+                      <div className="flex items-center gap-2 justify-center sm:justify-start">
+                        <p className="font-bold text-white text-xl">Projector Display Ready</p>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-bold border border-pink-500/30">
+                          Live Survey
+                        </span>
+                      </div>
+                      <p className="text-slate-300 text-[17px]">
+                        Display this QR code on the auditorium / lab projector screen at the end of the event. Attendees scan to submit their official feedback.
+                      </p>
+                      <p className="text-cyan-300 font-mono text-[17px] break-all">
+                        {event.feedback_google_form_url || mockFeedbackUrl}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-6 bg-black p-5 rounded-xl border border-purple-500/30">
-              <div className="w-28 h-28 bg-white p-2 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
-                <QrCode className="w-24 h-24 text-black" />
+            {/* Action Buttons (Matching User Request: Create in Drive, Script Generator, Import Responses, Sync to Certificates) */}
+            <div className="pt-3 border-t border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {/* 1-Click Create Feedback Form in Drive */}
+                {!event.feedback_google_form_url ? (
+                  <button
+                    onClick={handleCreateFeedbackInDrive}
+                    disabled={isCreatingFeedbackInDrive}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 hover:from-pink-400 hover:to-indigo-500 text-white text-[16px] font-extrabold flex items-center gap-2 transition shadow-lg shadow-purple-600/30 disabled:opacity-50"
+                  >
+                    {isCreatingFeedbackInDrive ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin text-white" />
+                        <span>Creating Feedback Form in CSI Drive...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5 text-amber-300" />
+                        <span>Create Feedback Form in Drive</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <>
+                    {/* Sync Feedback Responses to Certificates */}
+                    <button
+                      onClick={handleSyncFeedbackFromDrive}
+                      disabled={isSyncingFeedbackFromDrive}
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[16px] font-extrabold flex items-center gap-2 transition shadow-lg shadow-emerald-600/30 disabled:opacity-50"
+                      title="Fetch responses from Google Sheet into Certificate Pipeline"
+                    >
+                      {isSyncingFeedbackFromDrive ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Syncing Responses...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-5 h-5" />
+                          <span>Sync Responses to Certificates</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Toggle Feedback Status */}
+                    <button
+                      onClick={handleToggleFeedbackStatus}
+                      disabled={isTogglingFeedback}
+                      className={`px-4 py-2.5 rounded-xl text-[16px] font-bold border transition flex items-center gap-2 ${
+                        event.is_feedback_closed
+                          ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-600"
+                          : "bg-red-950/60 hover:bg-red-900/80 text-red-200 border-red-500/40"
+                      }`}
+                    >
+                      {isTogglingFeedback ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      <span>{event.is_feedback_closed ? "Re-open Feedback" : "Close Feedback Form"}</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Get Feedback Apps Script Modal Button */}
+                <button
+                  onClick={() => setIsFeedbackScriptModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
+                  title="View and copy exact Google Apps Script code"
+                >
+                  <FileCode className="w-4 h-4 text-purple-300" />
+                  <span>Get Feedback Apps Script</span>
+                </button>
+
+                {/* Connect Sheet / Import Responses Button */}
+                <button
+                  onClick={() => setIsFeedbackSyncModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
+                  title="Paste Google Sheet URL or load demo test data"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+                  <span>Connect Sheet / Import</span>
+                </button>
               </div>
-              <div className="space-y-2 text-center sm:text-left">
-                <p className="font-bold text-white text-xl">Projector Display Ready</p>
-                <p className="text-slate-300 text-[17px]">Directs attendees to official feedback survey at the end of the event.</p>
-                <p className="text-cyan-300 font-mono text-[17px] break-all">{mockFeedbackUrl}</p>
-              </div>
+
+              <button
+                onClick={() =>
+                  copyToClipboard(event.feedback_google_form_url || mockFeedbackUrl, "feedUrl")
+                }
+                className="text-[16px] text-pink-300 hover:text-white font-bold underline"
+              >
+                {copiedSection === "feedUrl" ? "Copied URL!" : "Copy Public Link"}
+              </button>
             </div>
           </div>
         </div>
@@ -1159,6 +1888,271 @@ export default function EventContainerPage() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Certificate Generation Pipeline (Connected to Feedback Form - Rule 6) */}
+        <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-5 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="text-lg font-bold text-amber-300 tracking-wide flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-400" />
+                  Certificate Generation Pipeline
+                </h3>
+                <span className="text-[13px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono font-bold border border-purple-500/30">
+                  Rule 6 Compliant
+                </span>
+                <span className="text-[13px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                  Connected to Feedback Form
+                </span>
+              </div>
+              <p className="text-slate-300 text-[16px] mt-1">
+                Certificates of Merit (1st, 2nd, 3rd) and Certificates of Participation are generated directly from verified feedback respondents.
+              </p>
+            </div>
+
+            {event.feedback_attendees && event.feedback_attendees.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleDownloadMeritCertificates}
+                  className="px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[15px] font-bold flex items-center gap-2 transition shadow"
+                  title="Download Certificates of Excellence for 1st, 2nd, and 3rd place winners"
+                >
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                  <span>Download Winners PDF</span>
+                </button>
+                <button
+                  onClick={handleDownloadBatchCertificates}
+                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[15px] font-bold flex items-center gap-2 transition shadow shadow-purple-600/30"
+                  title="Download all participation & merit certificates in one PDF"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download All Certificates</span>
+                </button>
+                <button
+                  onClick={handleClearFeedbackAttendees}
+                  className="px-3 py-2 rounded-lg bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-500/30 text-[15px] font-bold transition"
+                  title="Clear attendees and reset certificate list"
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+          </div>
+
+          {event.feedback_attendees && event.feedback_attendees.length > 0 ? (
+            <div className="space-y-5">
+              {/* Winner Allocation Card (1st, 2nd, 3rd Place) */}
+              <div className="p-5 rounded-xl bg-black border border-amber-500/30 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-amber-400" />
+                    <span className="font-bold text-white text-[17px]">
+                      Assign Event Winners (Certificates of Excellence / Merit):
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleSaveWinners}
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-extrabold flex items-center gap-1.5 transition shadow"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Save Winners</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[16px]">
+                  {/* 1st Place */}
+                  <div className="p-3.5 rounded-lg bg-amber-950/20 border border-amber-500/30 space-y-1.5">
+                    <label className="block text-xs font-bold text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+                      <span>🥇 1st Place (First Prize)</span>
+                    </label>
+                    <select
+                      value={firstPlaceWinner}
+                      onChange={(e) => setFirstPlaceWinner(e.target.value)}
+                      className="w-full bg-black border border-amber-500/40 rounded-lg p-2 text-sm text-white font-medium focus:outline-none focus:border-amber-400"
+                    >
+                      <option value="">-- Select 1st Place Winner --</option>
+                      {event.feedback_attendees.map((att) => (
+                        <option key={att.uid || att.name} value={att.uid || att.name}>
+                          {att.name} ({att.branch} - {att.uid})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 2nd Place */}
+                  <div className="p-3.5 rounded-lg bg-slate-900/40 border border-slate-500/30 space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
+                      <span>🥈 2nd Place (Second Prize)</span>
+                    </label>
+                    <select
+                      value={secondPlaceWinner}
+                      onChange={(e) => setSecondPlaceWinner(e.target.value)}
+                      className="w-full bg-black border border-slate-500/40 rounded-lg p-2 text-sm text-white font-medium focus:outline-none focus:border-purple-400"
+                    >
+                      <option value="">-- Select 2nd Place Winner --</option>
+                      {event.feedback_attendees.map((att) => (
+                        <option key={att.uid || att.name} value={att.uid || att.name}>
+                          {att.name} ({att.branch} - {att.uid})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 3rd Place */}
+                  <div className="p-3.5 rounded-lg bg-amber-950/10 border border-amber-700/30 space-y-1.5">
+                    <label className="block text-xs font-bold text-amber-500 uppercase tracking-wide flex items-center gap-1.5">
+                      <span>🥉 3rd Place (Third Prize)</span>
+                    </label>
+                    <select
+                      value={thirdPlaceWinner}
+                      onChange={(e) => setThirdPlaceWinner(e.target.value)}
+                      className="w-full bg-black border border-amber-700/40 rounded-lg p-2 text-sm text-white font-medium focus:outline-none focus:border-amber-600"
+                    >
+                      <option value="">-- Select 3rd Place Winner --</option>
+                      {event.feedback_attendees.map((att) => (
+                        <option key={att.uid || att.name} value={att.uid || att.name}>
+                          {att.name} ({att.branch} - {att.uid})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Verified Feedback Attendees Table */}
+              <div className="overflow-x-auto rounded-xl border border-purple-500/30">
+                <table className="w-full text-[17px] text-left border-collapse">
+                  <thead>
+                    <tr className="bg-purple-950/60 text-slate-200 border-b border-purple-500/30 uppercase text-xs font-bold tracking-wider">
+                      <th className="py-3 px-3 text-center w-12">#</th>
+                      <th className="py-3 px-4">Name (For Certificate)</th>
+                      <th className="py-3 px-3 text-center">UID</th>
+                      <th className="py-3 px-3 text-center">Branch</th>
+                      <th className="py-3 px-3 text-center">Year</th>
+                      <th className="py-3 px-3 text-center">Section</th>
+                      <th className="py-3 px-4 text-center">Category</th>
+                      <th className="py-3 px-4 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-purple-500/20 bg-black text-slate-200">
+                    {event.feedback_attendees.map((att, idx) => {
+                      let isFirst = firstPlaceWinner && (att.uid === firstPlaceWinner || att.name === firstPlaceWinner);
+                      let isSecond = secondPlaceWinner && (att.uid === secondPlaceWinner || att.name === secondPlaceWinner);
+                      let isThird = thirdPlaceWinner && (att.uid === thirdPlaceWinner || att.name === thirdPlaceWinner);
+                      let positionText = isFirst ? "1st Place Winner" : isSecond ? "2nd Place Winner" : isThird ? "3rd Place Winner" : "Participation";
+
+                      return (
+                        <tr key={att.uid || idx} className="hover:bg-purple-950/20 transition">
+                          <td className="py-3 px-3 text-center font-mono text-slate-400 text-sm">{idx + 1}</td>
+                          <td className="py-3 px-4 font-bold text-white text-[17px]">
+                            {att.name}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono text-cyan-300 text-sm">
+                            {att.uid || "—"}
+                          </td>
+                          <td className="py-3 px-3 text-center font-semibold text-purple-300">
+                            {att.branch || "—"}
+                          </td>
+                          <td className="py-3 px-3 text-center text-slate-300">
+                            {att.year_of_study || "—"}
+                          </td>
+                          <td className="py-3 px-3 text-center text-slate-400">
+                            {att.section || "—"}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {isFirst ? (
+                              <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold inline-flex items-center gap-1">
+                                🥇 1st Prize
+                              </span>
+                            ) : isSecond ? (
+                              <span className="px-2.5 py-1 rounded-full bg-slate-300/20 text-slate-200 border border-slate-300/40 text-xs font-bold inline-flex items-center gap-1">
+                                🥈 2nd Prize
+                              </span>
+                            ) : isThird ? (
+                              <span className="px-2.5 py-1 rounded-full bg-amber-700/20 text-amber-400 border border-amber-700/40 text-xs font-bold inline-flex items-center gap-1">
+                                🥉 3rd Prize
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 text-xs font-medium">
+                                Participation
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setPreviewCertAttendee(att);
+                                  setPreviewCertPosition(isFirst ? "1st" : isSecond ? "2nd" : isThird ? "3rd" : "participant");
+                                }}
+                                className="p-1.5 rounded-lg bg-purple-900/40 hover:bg-purple-800 text-purple-200 border border-purple-500/30 transition text-xs font-semibold flex items-center gap-1"
+                                title="Preview Certificate on screen"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Preview</span>
+                              </button>
+                              <button
+                                onClick={() => handleDownloadSingleCertificate(att)}
+                                className="p-1.5 rounded-lg bg-emerald-900/40 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/30 transition text-xs font-semibold flex items-center gap-1"
+                                title="Download Certificate PDF"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>PDF</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 rounded-xl bg-black border border-dashed border-purple-500/30 text-center space-y-4">
+              <div className="w-14 h-14 rounded-full bg-purple-950/60 border border-purple-500/40 flex items-center justify-center mx-auto text-purple-300">
+                <Award className="w-7 h-7" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h4 className="text-white font-bold text-lg">No Feedback Responses Synced Yet</h4>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  As per <strong>Rule 6 (Certificate Generation Pipeline)</strong>, student certificates are generated directly from verified feedback respondents.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 flex-wrap pt-2">
+                {event.feedback_google_sheet_url && (
+                  <button
+                    onClick={handleSyncFeedbackFromDrive}
+                    disabled={isSyncingFeedbackFromDrive}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold flex items-center gap-2 shadow"
+                  >
+                    {isSyncingFeedbackFromDrive ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    <span>Sync from Linked Google Sheet</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsFeedbackSyncModalOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-purple-900/40 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-sm font-bold flex items-center gap-2 transition"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Connect Sheet / Import Responses</span>
+                </button>
+                <button
+                  onClick={handleApplySampleFeedback}
+                  className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-sm font-bold flex items-center gap-2 transition"
+                  title="Instantly populate 8 demo feedback submissions to test certificate generation"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>Quick Test: Load Sample Attendees</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1357,7 +2351,438 @@ export default function EventContainerPage() {
         </div>
       )}
 
-      {/* ADMIN EASTER EGG MODAL */}
+      {/* FEEDBACK GOOGLE APPS SCRIPT GENERATOR MODAL */}
+      {isFeedbackScriptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#12101C] border border-pink-500/40 w-full max-w-3xl rounded-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5 text-white font-bold text-base">
+                <FileCode className="w-5 h-5 text-pink-400" />
+                <span>Google Apps Script — 2-Page Feedback Form &amp; Responses Generator</span>
+              </div>
+              <button
+                onClick={() => setIsFeedbackScriptModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-300 overflow-y-auto pr-1">
+              <div className="p-3 rounded-xl bg-pink-950/30 border border-pink-500/30 space-y-1.5">
+                <p className="font-bold text-pink-200 text-sm">
+                  Run directly in your CSI Gmail Drive (script.google.com)
+                </p>
+                <p className="text-slate-300 leading-relaxed">
+                  This custom script builds the exact 2-section feedback form (Section 1: 8 participant fields for certificates, Section 2: CO/PO Likert questions), creates the linked responses Google Sheet, and sets up your automated certificate pipeline!
+                </p>
+              </div>
+
+              {/* Step by Step Instructions */}
+              <div className="bg-black/60 p-4 rounded-xl border border-white/10 space-y-2">
+                <p className="font-bold text-white uppercase tracking-wider text-[11px]">How to Run in 4 Steps:</p>
+                <ol className="list-decimal list-inside space-y-1 text-slate-300 leading-relaxed">
+                  <li>
+                    Open Google Drive in your CSI Gmail account, then visit{" "}
+                    <a
+                      href="https://script.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 underline font-semibold"
+                    >
+                      script.google.com
+                    </a>{" "}
+                    and click <strong>+ New project</strong>.
+                  </li>
+                  <li>
+                    In the code editor, delete any existing text, paste the script below, and click <strong>Save</strong> (💾).
+                  </li>
+                  <li>
+                    Click <strong>Run</strong>. When prompted for authorization, click <em>Review permissions</em> &gt; <em>Advanced</em> &gt; <em>Go to Untitled project (unsafe)</em> &gt; <em>Allow</em>.
+                  </li>
+                  <li>
+                    Check the <strong>Execution log</strong> at the bottom of the screen: It gives you the <strong>Live Form Link</strong>, <strong>Form Edit Link</strong>, and <strong>Responses Google Sheet Link</strong>.
+                  </li>
+                </ol>
+              </div>
+
+              {/* Code Box */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span className="font-mono text-slate-300">FeedbackScript.gs (Auto-Tailored with CO/PO Mapping)</span>
+                  <button
+                    onClick={handleCopyFeedbackScript}
+                    className="px-3 py-1 rounded bg-pink-600/40 hover:bg-pink-600 text-pink-200 hover:text-white font-bold flex items-center gap-1.5 transition"
+                  >
+                    {feedbackScriptCopied ? (
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300">Copied to Clipboard!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Script</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <pre className="p-4 rounded-xl bg-black border border-pink-500/30 text-[11px] text-pink-300 font-mono overflow-x-auto max-h-64 leading-relaxed select-all">
+                  {feedbackScriptCode}
+                </pre>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-500">
+                Contains {activeFeedbackQuestions.length} evaluation questions + 8 student profile fields
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyFeedbackScript}
+                  className="px-4 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{feedbackScriptCopied ? "Copied!" : "Copy Full Script"}</span>
+                </button>
+                <button
+                  onClick={() => setIsFeedbackScriptModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FEEDBACK SHEET RESPONSES IMPORT MODAL */}
+      {isFeedbackSyncModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#12101C] border border-emerald-500/40 w-full max-w-lg rounded-2xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3">
+              <div className="flex items-center gap-2.5 text-white font-bold text-base">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <span>Connect Google Sheet / Import Feedback Responses</span>
+              </div>
+              <button
+                onClick={() => {
+                  setIsFeedbackSyncModalOpen(false);
+                  setFeedbackSyncStatus(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm text-slate-300">
+              <p className="leading-relaxed text-xs text-slate-400">
+                Paste your Feedback Responses Google Sheet share link or paste copied table rows directly. The system extracts <strong>Name (As required in the certificate)</strong>, <strong>UID</strong>, <strong>Gender</strong>, <strong>Branch</strong>, and <strong>Year</strong> into the Certificate Pipeline.
+              </p>
+
+              <form onSubmit={handleSyncFeedbackData} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 uppercase tracking-wide">
+                    Google Sheet Share Link OR Pasted CSV / TSV Rows
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={feedbackSheetInput}
+                    onChange={(e) => setFeedbackSheetInput(e.target.value)}
+                    placeholder="e.g. https://docs.google.com/spreadsheets/d/.../edit or paste responses rows..."
+                    className="w-full bg-black border border-purple-500/40 rounded-xl p-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+
+                {feedbackSyncStatus && (
+                  <div
+                    className={`p-3 rounded-lg text-xs font-bold flex items-center gap-2 border ${
+                      feedbackSyncStatus.success
+                        ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
+                        : "bg-red-950/60 border-red-500/50 text-red-300"
+                    }`}
+                  >
+                    {feedbackSyncStatus.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                    <span>{feedbackSyncStatus.message}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2 gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleApplySampleFeedback}
+                    className="px-3 py-1.5 rounded-lg bg-purple-900/40 hover:bg-purple-900/70 border border-purple-500/40 text-purple-200 text-xs font-bold transition"
+                  >
+                    Quick Test (Load 8 Submissions)
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsFeedbackSyncModalOpen(false);
+                        setFeedbackSyncStatus(null);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white text-xs font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isFeedbackSyncing || !feedbackSheetInput.trim()}
+                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow"
+                    >
+                      {isFeedbackSyncing ? "Mapping..." : "Sync Responses"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOMIZE CO / PO QUESTIONS MODAL */}
+      {isCustomizeQuestionsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#12101C] border border-purple-500/40 w-full max-w-3xl rounded-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5 text-white font-bold text-base">
+                <Sliders className="w-5 h-5 text-purple-400" />
+                <span>Customize CO / PO Evaluation Questions ({event.event_name})</span>
+              </div>
+              <button
+                onClick={() => setIsCustomizeQuestionsOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-300 overflow-y-auto pr-1">
+              <p className="text-slate-400 leading-relaxed">
+                Tailor each question's title and description or select which Programme Outcomes (PO1–PO12) are mapped to this event.
+              </p>
+
+              <div className="space-y-3">
+                {activeFeedbackQuestions.map((q, idx) => (
+                  <div key={q.id || idx} className="p-3.5 rounded-xl bg-black border border-purple-500/30 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-amber-300 text-xs">Question {idx + 1} ({q.type})</span>
+                      <div className="flex items-center gap-1">
+                        {q.po_mapping.map((p) => (
+                          <span key={p} className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 text-[11px] font-mono font-bold">
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      value={q.title}
+                      onChange={(e) => {
+                        const updatedList = [...activeFeedbackQuestions];
+                        updatedList[idx] = { ...updatedList[idx], title: e.target.value };
+                        setActiveFeedbackQuestions(updatedList);
+                      }}
+                      className="w-full bg-slate-950 border border-white/20 rounded-lg p-2 text-xs text-white font-semibold focus:outline-none focus:border-purple-400"
+                    />
+                    <textarea
+                      rows={2}
+                      value={q.description}
+                      onChange={(e) => {
+                        const updatedList = [...activeFeedbackQuestions];
+                        updatedList[idx] = { ...updatedList[idx], description: e.target.value };
+                        setActiveFeedbackQuestions(updatedList);
+                      }}
+                      className="w-full bg-slate-950 border border-white/10 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-purple-400"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const defaults = generateDefaultFeedbackQuestions(event);
+                  setActiveFeedbackQuestions(defaults);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+              >
+                Reset to Event Defaults
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCustomizeQuestionsOpen(false)}
+                  className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow"
+                >
+                  Save &amp; Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LIVE CERTIFICATE VISUAL PREVIEW MODAL */}
+      {previewCertAttendee && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#12101C] border border-amber-500/40 w-full max-w-4xl rounded-2xl p-6 space-y-5 shadow-2xl max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5 text-white font-bold text-base">
+                <Award className="w-5 h-5 text-amber-400" />
+                <span>
+                  Official Certificate Preview — {previewCertPosition === "1st" || previewCertPosition === "2nd" || previewCertPosition === "3rd" ? "Certificate of Excellence" : "Certificate of Participation"}
+                </span>
+              </div>
+              <button
+                onClick={() => setPreviewCertAttendee(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* High-Definition Visual Certificate Canvas */}
+            <div className="overflow-y-auto p-1">
+              <div
+                className="bg-[#FCFCFA] text-black p-8 sm:p-12 rounded-xl border-4 border-[#18122B] shadow-2xl relative select-none"
+                style={{ fontFamily: "'Times New Roman', Times, serif" }}
+              >
+                {/* Gold Inner Border with Corner Ornaments */}
+                <div className="absolute inset-2 border-2 border-amber-600 pointer-events-none" />
+                <div className="absolute top-3 left-3 w-3 h-3 bg-amber-600 pointer-events-none" />
+                <div className="absolute top-3 right-3 w-3 h-3 bg-amber-600 pointer-events-none" />
+                <div className="absolute bottom-3 left-3 w-3 h-3 bg-amber-600 pointer-events-none" />
+                <div className="absolute bottom-3 right-3 w-3 h-3 bg-amber-600 pointer-events-none" />
+
+                {/* Header with Logos */}
+                <div className="flex items-center justify-between mb-4 gap-4 relative z-10">
+                  <div className="w-24 shrink-0 flex items-center justify-start">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/logos/rset_logo.png"
+                      alt="RSET Silver Jubilee Logo"
+                      className="h-16 w-auto object-contain"
+                    />
+                  </div>
+
+                  <div className="text-center flex-1 space-y-1">
+                    <h3 className="text-sm sm:text-base md:text-lg font-bold tracking-tight uppercase text-[#18122B]">
+                      RAJAGIRI SCHOOL OF ENGINEERING &amp; TECHNOLOGY (AUTONOMOUS)
+                    </h3>
+                    <p className="text-xs sm:text-sm font-bold tracking-wide text-[#3E3259]">
+                      COMPUTER SOCIETY OF INDIA STUDENT BRANCH - RSET
+                    </p>
+                    <p className="text-[10px] italic text-slate-500">
+                      Rajagiri Valley, Kakkanad, Kochi, Kerala - 682039
+                    </p>
+                  </div>
+
+                  <div className="w-24 shrink-0 flex items-center justify-end">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/logos/csi_logo.png"
+                      alt="CSI Official Logo"
+                      className="h-14 w-14 object-contain"
+                    />
+                  </div>
+                </div>
+
+                {/* Certificate Title */}
+                <div className="text-center my-6 relative z-10">
+                  <h2
+                    className={`text-2xl sm:text-3xl font-extrabold tracking-wide uppercase ${
+                      previewCertPosition === "1st" || previewCertPosition === "2nd" || previewCertPosition === "3rd"
+                        ? "text-amber-700"
+                        : "text-[#18122B]"
+                    }`}
+                  >
+                    {previewCertPosition === "1st" || previewCertPosition === "2nd" || previewCertPosition === "3rd"
+                      ? "CERTIFICATE OF EXCELLENCE"
+                      : "CERTIFICATE OF PARTICIPATION"}
+                  </h2>
+                  <div className="w-32 h-0.5 bg-amber-600 mx-auto mt-2" />
+                </div>
+
+                {/* Body Content */}
+                <div className="text-center space-y-4 max-w-2xl mx-auto my-6 relative z-10 text-slate-800 text-[15px] sm:text-[17px] leading-relaxed">
+                  <p className="italic text-slate-600">This is to proudly certify that</p>
+
+                  <p className="text-xl sm:text-2xl font-bold uppercase text-black tracking-wide border-b border-black inline-block px-4 pb-0.5">
+                    {previewCertAttendee.gender ? `${previewCertAttendee.gender}. ` : ""}
+                    {previewCertAttendee.name}
+                  </p>
+
+                  <p>
+                    of {previewCertAttendee.year_of_study ? `${previewCertAttendee.year_of_study} Year, ` : ""}Department of {previewCertAttendee.branch || "CSE"}{previewCertAttendee.uid ? ` (UID: ${previewCertAttendee.uid})` : ""}{" "}
+                    {previewCertPosition === "1st"
+                      ? "has secured FIRST PLACE (1st Prize)"
+                      : previewCertPosition === "2nd"
+                      ? "has secured SECOND PLACE (2nd Prize)"
+                      : previewCertPosition === "3rd"
+                      ? "has secured THIRD PLACE (3rd Prize)"
+                      : "has successfully participated"}{" "}
+                    in the technical event
+                  </p>
+
+                  <p className="text-lg sm:text-xl font-bold text-black tracking-wide">
+                    &ldquo;{event.event_name}&rdquo;
+                  </p>
+
+                  <p className="text-xs sm:text-sm text-slate-600">
+                    organized by the Computer Society of India (CSI) Student Branch on {formatFullDateWithDay(event.event_date)}{event.venue ? ` at ${event.venue}` : ""}.
+                  </p>
+                </div>
+
+                {/* Signatures */}
+                <div className="flex items-center justify-between pt-10 px-4 text-center text-xs relative z-10 gap-4">
+                  <div className="w-40 border-t border-slate-400 pt-2 space-y-0.5">
+                    <p className="font-bold text-black">Dr. Neeba E A</p>
+                    <p className="text-[10px] text-slate-600">Branch Counselor, CSI SB RSET</p>
+                  </div>
+                  <div className="w-40 border-t border-slate-400 pt-2 space-y-0.5">
+                    <p className="font-bold text-black">{facultyCoordinator}</p>
+                    <p className="text-[10px] text-slate-600">Faculty Coordinator, CSI SB RSET</p>
+                  </div>
+                  <div className="w-40 border-t border-slate-400 pt-2 space-y-0.5">
+                    <p className="font-bold text-black">Student Chair</p>
+                    <p className="text-[10px] text-slate-600">CSI Student Branch, RSET</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-400 font-mono">
+                Verified UID: {previewCertAttendee.uid || "N/A"} • Category: {previewCertPosition}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDownloadSingleCertificate(previewCertAttendee)}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 transition shadow"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download High-Def PDF</span>
+                </button>
+                <button
+                  onClick={() => setPreviewCertAttendee(null)}
+                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {isEasterEggOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="bg-[#12101C] border border-purple-500/40 w-full max-w-md rounded-2xl p-6 space-y-5 shadow-2xl">
