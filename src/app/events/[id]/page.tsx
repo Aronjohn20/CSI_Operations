@@ -32,10 +32,12 @@ import {
   Trophy,
   Award,
   Eye,
+  EyeOff,
   Sliders,
   HelpCircle,
   ChevronDown,
 } from "lucide-react";
+import QRCode from "qrcode";
 import {
   CSIEvent,
   RegisteredAttendee,
@@ -370,6 +372,11 @@ export default function EventContainerPage() {
   const [isSyncingFeedbackFromDrive, setIsSyncingFeedbackFromDrive] = useState(false);
   const [feedbackActionNotice, setFeedbackActionNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Preview Toggles
+  const [showRegPreview, setShowRegPreview] = useState(false);
+  const [showFeedbackPreview, setShowFeedbackPreview] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+
   // Modals for Feedback
   const [isFeedbackScriptModalOpen, setIsFeedbackScriptModalOpen] = useState(false);
   const [feedbackScriptCopied, setFeedbackScriptCopied] = useState(false);
@@ -377,7 +384,6 @@ export default function EventContainerPage() {
   const [feedbackSheetInput, setFeedbackSheetInput] = useState("");
   const [isFeedbackSyncing, setIsFeedbackSyncing] = useState(false);
   const [feedbackSyncStatus, setFeedbackSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
-  const [isCustomizeQuestionsOpen, setIsCustomizeQuestionsOpen] = useState(false);
 
   // Certificate Pipeline States
   const [firstPlaceWinner, setFirstPlaceWinner] = useState<string>("");
@@ -391,18 +397,23 @@ export default function EventContainerPage() {
   // Initialize feedback questions and saved winners when event loads
   useEffect(() => {
     if (event) {
-      if (event.custom_feedback_questions && event.custom_feedback_questions.length > 0) {
-        setActiveFeedbackQuestions(event.custom_feedback_questions);
-      } else {
-        setActiveFeedbackQuestions(generateDefaultFeedbackQuestions(event));
-      }
+      setActiveFeedbackQuestions(generateDefaultFeedbackQuestions(event));
       if (event.winners) {
         setFirstPlaceWinner(event.winners.first_place || "");
         setSecondPlaceWinner(event.winners.second_place || "");
         setThirdPlaceWinner(event.winners.third_place || "");
       }
+
+      const targetUrl = event.feedback_google_form_url || `https://forms.gle/csi-feedback-${event.id}`;
+      QRCode.toDataURL(targetUrl, {
+        width: 600,
+        margin: 2,
+        color: { dark: "#000000", light: "#ffffff" },
+      })
+        .then(setQrDataUrl)
+        .catch(console.error);
     }
-  }, [event?.id]);
+  }, [event?.id, event?.feedback_google_form_url, event?.event_name, event?.brief_description]);
 
   const handleCopyFeedbackScript = () => {
     navigator.clipboard.writeText(feedbackScriptCode);
@@ -1135,7 +1146,15 @@ export default function EventContainerPage() {
                   <ExternalLink className="w-5 h-5 text-amber-400" />
                   Registration Form
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPreview(!showRegPreview)}
+                    className="text-[13px] px-3 py-1 rounded-full bg-purple-900/40 hover:bg-purple-800 text-purple-200 font-bold border border-purple-500/40 flex items-center gap-1.5 transition"
+                  >
+                    {showRegPreview ? <EyeOff className="w-3.5 h-3.5 text-purple-300" /> : <Eye className="w-3.5 h-3.5 text-purple-300" />}
+                    <span>{showRegPreview ? "Hide Preview" : "Show Preview"}</span>
+                  </button>
                   {event.google_form_url && (
                     <span className="text-[14px] px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 flex items-center gap-1.5">
                       <Check className="w-4 h-4 text-cyan-400" />
@@ -1222,88 +1241,90 @@ export default function EventContainerPage() {
                 </div>
               )}
 
-              {/* Form Questions Overview matching user screenshots */}
-              <div className="bg-black p-5 rounded-xl border border-purple-500/30 space-y-4">
-                <div className="flex items-center justify-between pb-2.5 border-b border-purple-500/20">
-                  <span className="font-bold text-slate-200 text-[17px]">Official Form Questions (10 Fields):</span>
-                  <span className="text-[14px] px-3 py-1 rounded bg-amber-500/20 text-amber-300 font-mono font-semibold">
-                    All Required except CSI ID
-                  </span>
-                </div>
+              {/* Form Questions Overview (Toggled via Show Preview) */}
+              {showRegPreview && (
+                <div className="bg-black p-5 rounded-xl border border-purple-500/30 space-y-4">
+                  <div className="flex items-center justify-between pb-2.5 border-b border-purple-500/20">
+                    <span className="font-bold text-slate-200 text-[17px]">Official Form Questions (10 Fields):</span>
+                    <span className="text-[14px] px-3 py-1 rounded bg-amber-500/20 text-amber-300 font-mono font-semibold">
+                      All Required except CSI ID
+                    </span>
+                  </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-[17px]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">1.</span>
-                    <span className="font-bold text-white">Email</span>
-                    <span className="text-red-400 font-bold">*</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-[17px]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">1.</span>
+                      <span className="font-bold text-white">Email</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">2.</span>
+                      <span className="font-bold text-white">Title</span>
+                      <span className="text-red-400 font-bold">*</span>
+                      <span className="text-slate-400 text-[15px] font-normal">(Mr / Ms)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">3.</span>
+                      <span className="font-bold text-white">Name</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">4.</span>
+                      <span className="font-bold text-white">Rajagiri Email ID</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">5.</span>
+                      <span className="font-bold text-white">Contact No.(Preferably WhatsApp)</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">6.</span>
+                      <span className="font-bold text-white">Year of study</span>
+                      <span className="text-red-400 font-bold">*</span>
+                      <span className="text-slate-400 text-[15px] font-normal">(1st – 4th yr)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">7.</span>
+                      <span className="font-bold text-white">Department</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">8.</span>
+                      <span className="font-bold text-white">Division</span>
+                      <span className="text-red-400 font-bold">*</span>
+                      <span className="text-slate-400 text-[15px] font-normal">(Alpha - Nil)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-400 font-bold font-mono">9.</span>
+                      <span className="font-bold text-white">Are you a CSI member?</span>
+                      <span className="text-red-400 font-bold">*</span>
+                    </div>
+                    <div className="flex items-center gap-2 col-span-1 md:col-span-2">
+                      <span className="text-slate-500 font-bold font-mono">10.</span>
+                      <span className="font-bold text-white">If yes, enter CSI membership id</span>
+                      <span className="text-slate-400 text-[15px] font-normal">(Optional)</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">2.</span>
-                    <span className="font-bold text-white">Title</span>
-                    <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[15px] font-normal">(Mr / Ms)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">3.</span>
-                    <span className="font-bold text-white">Name</span>
-                    <span className="text-red-400 font-bold">*</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">4.</span>
-                    <span className="font-bold text-white">Rajagiri Email ID</span>
-                    <span className="text-red-400 font-bold">*</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">5.</span>
-                    <span className="font-bold text-white">Contact No.(Preferably WhatsApp)</span>
-                    <span className="text-red-400 font-bold">*</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">6.</span>
-                    <span className="font-bold text-white">Year of study</span>
-                    <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[15px] font-normal">(1st – 4th yr)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">7.</span>
-                    <span className="font-bold text-white">Department</span>
-                    <span className="text-red-400 font-bold">*</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">8.</span>
-                    <span className="font-bold text-white">Division</span>
-                    <span className="text-red-400 font-bold">*</span>
-                    <span className="text-slate-400 text-[15px] font-normal">(Alpha - Nil)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400 font-bold font-mono">9.</span>
-                    <span className="font-bold text-white">Are you a CSI member?</span>
-                    <span className="text-red-400 font-bold">*</span>
-                  </div>
-                  <div className="flex items-center gap-2 col-span-1 md:col-span-2">
-                    <span className="text-slate-500 font-bold font-mono">10.</span>
-                    <span className="font-bold text-white">If yes, enter CSI membership id</span>
-                    <span className="text-slate-400 text-[15px] font-normal">(Optional)</span>
-                  </div>
-                </div>
 
-                {/* Dynamic Departments based on event container */}
-                <div className="pt-3 border-t border-purple-500/20 space-y-2">
-                  <span className="text-[17px] text-slate-300 font-semibold block">
-                    Dynamic Department Options (injected from event branches):
-                  </span>
-                  <div className="flex flex-wrap gap-2.5">
-                    {eventDepartments.map((dept) => (
-                      <span
-                        key={dept}
-                        className="px-3.5 py-1.5 rounded-md bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold font-mono text-[15px]"
-                      >
-                        {dept}
-                      </span>
-                    ))}
+                  {/* Dynamic Departments based on event container */}
+                  <div className="pt-3 border-t border-purple-500/20 space-y-2">
+                    <span className="text-[17px] text-slate-300 font-semibold block">
+                      Dynamic Department Options (injected from event branches):
+                    </span>
+                    <div className="flex flex-wrap gap-2.5">
+                      {eventDepartments.map((dept) => (
+                        <span
+                          key={dept}
+                          className="px-3.5 py-1.5 rounded-md bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-bold font-mono text-[15px]"
+                        >
+                          {dept}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Primary Action Buttons */}
@@ -1386,13 +1407,15 @@ export default function EventContainerPage() {
                   <QrCode className="w-5 h-5 text-pink-400" />
                   Feedback Form &amp; QR Code
                 </span>
-                <div className="flex items-center gap-2">
-                  {event.feedback_google_form_url && (
-                    <span className="text-[14px] px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-cyan-400" />
-                      Live in CSI Drive
-                    </span>
-                  )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowFeedbackPreview(!showFeedbackPreview)}
+                    className="text-[13px] px-3 py-1 rounded-full bg-pink-900/40 hover:bg-pink-800 text-pink-200 font-bold border border-pink-500/40 flex items-center gap-1.5 transition"
+                  >
+                    {showFeedbackPreview ? <EyeOff className="w-3.5 h-3.5 text-pink-300" /> : <Eye className="w-3.5 h-3.5 text-pink-300" />}
+                    <span>{showFeedbackPreview ? "Hide Preview" : "Show Preview"}</span>
+                  </button>
                   {event.is_feedback_closed ? (
                     <span className="text-[14px] px-3 py-1 rounded-full bg-red-500/20 text-red-300 font-bold border border-red-500/30">
                       Feedback Closed
@@ -1402,14 +1425,10 @@ export default function EventContainerPage() {
                       Feedback Open
                     </span>
                   ) : null}
-                  {event.feedback_attendees && event.feedback_attendees.length > 0 ? (
+                  {event.feedback_attendees && event.feedback_attendees.length > 0 && (
                     <span className="text-[14px] px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                       {event.feedback_attendees.length} Verified for Certificates
-                    </span>
-                  ) : (
-                    <span className="text-[14px] px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                      Awaiting Feedback Sync
                     </span>
                   )}
                 </div>
@@ -1473,181 +1492,179 @@ export default function EventContainerPage() {
                 </div>
               )}
 
-              {/* Form Overview Matching Exact User Format */}
-              <div className="bg-black p-5 rounded-xl border border-purple-500/30 space-y-5">
-                {/* Form Title & Description Header (Section 1 Header) */}
-                <div className="p-4 rounded-xl bg-gradient-to-r from-purple-950/50 to-pink-950/40 border border-pink-500/30 space-y-2">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <h4 className="text-xl font-bold text-white tracking-wide">
-                      {event.event_name} Feedback
-                    </h4>
-                    <span className="text-xs px-2.5 py-1 rounded bg-pink-500/20 text-pink-300 font-mono font-bold">
-                      Section 1 of 2
-                    </span>
-                  </div>
-                  <p className="text-[17px] text-slate-300 whitespace-pre-line leading-relaxed">
-                    {getFeedbackHeaderDescription(event)}
-                  </p>
-                </div>
-
-                {/* Section 1: Standard Attendee Profile (First 2 Pages) */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
-                    <span className="font-bold text-slate-200 text-[17px]">
-                      Standard Attendee Profile (8 Fields - Fixed College Format):
-                    </span>
-                    <span className="text-[14px] px-3 py-1 rounded bg-amber-500/20 text-amber-300 font-mono font-semibold">
-                      All 8 Required for Certificate Verification
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-[17px]">
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">1.</span>
-                      <span className="font-bold text-white">Name (As required in the certificate)</span>
-                      <span className="text-red-400 font-bold">*</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">2.</span>
-                      <span className="font-bold text-white">UID</span>
-                      <span className="text-red-400 font-bold">*</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">3.</span>
-                      <span className="font-bold text-white">UID Email</span>
-                      <span className="text-red-400 font-bold">*</span>
-                      <span className="text-slate-400 text-[15px] font-normal">(if no then provide your personal email)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">4.</span>
-                      <span className="font-bold text-white">Gender</span>
-                      <span className="text-red-400 font-bold">*</span>
-                      <span className="text-slate-400 text-[15px] font-normal">(Mr / Mrs)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">5.</span>
-                      <span className="font-bold text-white">Year of Study</span>
-                      <span className="text-red-400 font-bold">*</span>
-                      <span className="text-slate-400 text-[15px] font-normal">(1st, 2nd, 3rd, 4th)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">6.</span>
-                      <span className="font-bold text-white">Branch</span>
-                      <span className="text-red-400 font-bold">*</span>
-                      <span className="text-cyan-300 text-[15px] font-mono">({eventDepartments.join(", ")})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">7.</span>
-                      <span className="font-bold text-white">Section</span>
-                      <span className="text-red-400 font-bold">*</span>
-                      <span className="text-slate-400 text-[15px] font-normal">(Alpha, Beta, Gamma, Delta, Nil)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">8.</span>
-                      <span className="font-bold text-white">WhatsApp No</span>
-                      <span className="text-red-400 font-bold">*</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 2: Event-Specific CO/PO Evaluation (FEEDBACK FORM) */}
-                <div className="pt-4 border-t border-purple-500/20 space-y-4">
-                  <div className="flex items-center justify-between pb-2 border-b border-purple-500/20 flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-200 text-[17px]">
-                        Section 2 of 2: FEEDBACK FORM (Event-Specific CO / PO Evaluation)
-                      </span>
-                      <span className="text-[13px] px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono font-semibold">
-                        NBA / AICTE Criteria
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setIsCustomizeQuestionsOpen(true)}
-                      className="px-3 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition"
-                    >
-                      <Sliders className="w-3.5 h-3.5 text-purple-300" />
-                      <span>Customize CO/PO Questions</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {activeFeedbackQuestions.map((q, idx) => (
-                      <div
-                        key={q.id || idx}
-                        className="p-4 rounded-xl bg-slate-950/80 border border-purple-500/20 space-y-2 text-[17px]"
-                      >
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-amber-400 font-bold font-mono">{idx + 1}.</span>
-                            <span className="font-bold text-white">{q.title}</span>
-                            <span className="text-red-400 font-bold">*</span>
-                          </div>
-                          {q.po_mapping && q.po_mapping.length > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              {q.po_mapping.map((po) => (
-                                <span
-                                  key={po}
-                                  className="px-2.5 py-0.5 rounded text-xs font-bold font-mono bg-cyan-950 text-cyan-300 border border-cyan-500/40"
-                                  title={PO_DEFINITIONS[po]?.title || po}
-                                >
-                                  {po}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <p className="text-slate-300 text-[16px] leading-relaxed pl-5">
-                          {q.description}
-                        </p>
-
-                        {q.type === "likert_scale" ? (
-                          <div className="pl-5 pt-2 flex flex-wrap gap-2 sm:gap-4 text-xs font-semibold text-slate-400">
-                            {["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"].map((opt) => (
-                              <label key={opt} className="flex items-center gap-1.5 cursor-default">
-                                <span className="w-3.5 h-3.5 rounded-full border border-slate-500 inline-block" />
-                                <span>{opt}</span>
-                              </label>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="pl-5 pt-2">
-                            <div className="p-2.5 rounded-lg bg-black border border-white/10 text-xs text-slate-500 italic">
-                              [Long answer text (Paragraph response)]
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Projector Display Ready QR Code */}
-                <div className="pt-4 border-t border-purple-500/20">
-                  <div className="flex flex-col sm:flex-row items-center gap-6 bg-slate-950 p-5 rounded-xl border border-pink-500/30">
-                    <div className="w-28 h-28 bg-white p-2 rounded-xl flex items-center justify-center shrink-0 shadow-lg">
+              {/* Projector Display Ready QR Code with Direct Download */}
+              <div className="bg-slate-950 p-6 rounded-xl border border-pink-500/30 mb-4">
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <div className="w-32 h-32 bg-white p-2.5 rounded-xl flex items-center justify-center shrink-0 shadow-xl border border-white/20">
+                    {qrDataUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={qrDataUrl}
+                        alt={`${event.event_name} Feedback QR Code`}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
                       <QrCode className="w-24 h-24 text-black" />
-                    </div>
-                    <div className="space-y-2 text-center sm:text-left flex-1">
-                      <div className="flex items-center gap-2 justify-center sm:justify-start">
-                        <p className="font-bold text-white text-xl">Projector Display Ready</p>
-                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-bold border border-pink-500/30">
-                          Live Survey
-                        </span>
-                      </div>
-                      <p className="text-slate-300 text-[17px]">
-                        Display this QR code on the auditorium / lab projector screen at the end of the event. Attendees scan to submit their official feedback.
-                      </p>
-                      <p className="text-cyan-300 font-mono text-[17px] break-all">
-                        {event.feedback_google_form_url || mockFeedbackUrl}
-                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 text-center sm:text-left flex-1">
+                    <p className="text-cyan-300 font-mono text-[17px] break-all">
+                      {event.feedback_google_form_url || mockFeedbackUrl}
+                    </p>
+
+                    <div className="pt-1 flex items-center gap-3 justify-center sm:justify-start flex-wrap">
+                      {qrDataUrl && (
+                        <a
+                          href={qrDataUrl}
+                          download={`${event.event_name.replace(/[^a-zA-Z0-9_-]/g, "_")}_Feedback_QR.png`}
+                          className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-[15px] font-bold inline-flex items-center gap-2 transition shadow shadow-pink-600/30"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Download QR Code (PNG)</span>
+                        </a>
+                      )}
+                      <button
+                        onClick={() =>
+                          copyToClipboard(event.feedback_google_form_url || mockFeedbackUrl, "feedUrl")
+                        }
+                        className="px-3.5 py-2 rounded-xl bg-purple-900/40 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-[15px] font-bold inline-flex items-center gap-2 transition"
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span>{copiedSection === "feedUrl" ? "Copied URL!" : "Copy URL"}</span>
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Form Overview (Toggled via Show Preview - Without Description or NBA / AICTE Banner) */}
+              {showFeedbackPreview && (
+                <div className="bg-black p-5 rounded-xl border border-purple-500/30 space-y-5">
+                  {/* Section 1: Standard Attendee Profile (First 2 Pages) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-purple-500/20">
+                      <span className="font-bold text-slate-200 text-[17px]">
+                        Standard Attendee Profile (8 Fields - Fixed College Format):
+                      </span>
+                      <span className="text-[14px] px-3 py-1 rounded bg-amber-500/20 text-amber-300 font-mono font-semibold">
+                        All 8 Required for Certificate Verification
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-[17px]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold font-mono">1.</span>
+                        <span className="font-bold text-white">Name (As required in the certificate)</span>
+                        <span className="text-red-400 font-bold">*</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold font-mono">2.</span>
+                        <span className="font-bold text-white">UID</span>
+                        <span className="text-red-400 font-bold">*</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold font-mono">3.</span>
+                        <span className="font-bold text-white">UID Email</span>
+                        <span className="text-red-400 font-bold">*</span>
+                        <span className="text-slate-400 text-[15px] font-normal">(if no then provide your personal email)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold font-mono">4.</span>
+                        <span className="font-bold text-white">Gender</span>
+                        <span className="text-red-400 font-bold">*</span>
+                        <span className="text-slate-400 text-[15px] font-normal">(Mr / Mrs)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold font-mono">5.</span>
+                        <span className="font-bold text-white">Year of Study</span>
+                        <span className="text-red-400 font-bold">*</span>
+                        <span className="text-slate-400 text-[15px] font-normal">(1st, 2nd, 3rd, 4th)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold font-mono">6.</span>
+                        <span className="font-bold text-white">Branch</span>
+                        <span className="text-red-400 font-bold">*</span>
+                        <span className="text-cyan-300 text-[15px] font-mono">({eventDepartments.join(", ")})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold font-mono">7.</span>
+                        <span className="font-bold text-white">Section</span>
+                        <span className="text-red-400 font-bold">*</span>
+                        <span className="text-slate-400 text-[15px] font-normal">(Alpha, Beta, Gamma, Delta, Nil)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold font-mono">8.</span>
+                        <span className="font-bold text-white">WhatsApp No</span>
+                        <span className="text-red-400 font-bold">*</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Event-Specific CO/PO Evaluation (FEEDBACK FORM) */}
+                  <div className="pt-4 border-t border-purple-500/20 space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-purple-500/20 flex-wrap gap-2">
+                      <span className="font-bold text-slate-200 text-[17px]">
+                        Section 2 of 2: FEEDBACK FORM (Event-Specific CO / PO Evaluation)
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {activeFeedbackQuestions.map((q, idx) => (
+                        <div
+                          key={q.id || idx}
+                          className="p-4 rounded-xl bg-slate-950/80 border border-purple-500/20 space-y-2 text-[17px]"
+                        >
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-amber-400 font-bold font-mono">{idx + 1}.</span>
+                              <span className="font-bold text-white">{q.title}</span>
+                              <span className="text-red-400 font-bold">*</span>
+                            </div>
+                            {q.po_mapping && q.po_mapping.length > 0 && (
+                              <div className="flex items-center gap-1.5">
+                                {q.po_mapping.map((po) => (
+                                  <span
+                                    key={po}
+                                    className="px-2.5 py-0.5 rounded text-xs font-bold font-mono bg-cyan-950 text-cyan-300 border border-cyan-500/40"
+                                    title={PO_DEFINITIONS[po]?.title || po}
+                                  >
+                                    {po}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <p className="text-slate-300 text-[16px] leading-relaxed pl-5">
+                            {q.description}
+                          </p>
+
+                          {q.type === "likert_scale" ? (
+                            <div className="pl-5 pt-2 flex flex-wrap gap-2 sm:gap-4 text-xs font-semibold text-slate-400">
+                              {["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"].map((opt) => (
+                                <label key={opt} className="flex items-center gap-1.5 cursor-default">
+                                  <span className="w-3.5 h-3.5 rounded-full border border-slate-500 inline-block" />
+                                  <span>{opt}</span>
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="pl-5 pt-2">
+                              <div className="p-2.5 rounded-lg bg-black border border-white/10 text-xs text-slate-500 italic">
+                                [Long answer text (Paragraph response)]
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Action Buttons (Matching User Request: Create in Drive, Script Generator, Import Responses, Sync to Certificates) */}
+            {/* Action Buttons */}
             <div className="pt-3 border-t border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2.5 flex-wrap">
                 {/* 1-Click Create Feedback Form in Drive */}
@@ -1706,26 +1723,6 @@ export default function EventContainerPage() {
                     </button>
                   </>
                 )}
-
-                {/* Get Feedback Apps Script Modal Button */}
-                <button
-                  onClick={() => setIsFeedbackScriptModalOpen(true)}
-                  className="px-4 py-2.5 rounded-xl bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
-                  title="View and copy exact Google Apps Script code"
-                >
-                  <FileCode className="w-4 h-4 text-purple-300" />
-                  <span>Get Feedback Apps Script</span>
-                </button>
-
-                {/* Connect Sheet / Import Responses Button */}
-                <button
-                  onClick={() => setIsFeedbackSyncModalOpen(true)}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
-                  title="Paste Google Sheet URL or load demo test data"
-                >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
-                  <span>Connect Sheet / Import</span>
-                </button>
               </div>
 
               <button
@@ -1738,7 +1735,6 @@ export default function EventContainerPage() {
               </button>
             </div>
           </div>
-        </div>
 
         {/* Attendance Sheet */}
         <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-5 shadow-xl">
@@ -1889,6 +1885,7 @@ export default function EventContainerPage() {
             </table>
           </div>
         </div>
+      </div>
       </div>
 
       {/* GOOGLE APPS SCRIPT GENERATOR MODAL */}
@@ -2275,91 +2272,6 @@ export default function EventContainerPage() {
                   </div>
                 </div>
               </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CUSTOMIZE CO / PO QUESTIONS MODAL */}
-      {isCustomizeQuestionsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#12101C] border border-purple-500/40 w-full max-w-3xl rounded-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3 shrink-0">
-              <div className="flex items-center gap-2.5 text-white font-bold text-base">
-                <Sliders className="w-5 h-5 text-purple-400" />
-                <span>Customize CO / PO Evaluation Questions ({event.event_name})</span>
-              </div>
-              <button
-                onClick={() => setIsCustomizeQuestionsOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs text-slate-300 overflow-y-auto pr-1">
-              <p className="text-slate-400 leading-relaxed">
-                Tailor each question's title and description or select which Programme Outcomes (PO1–PO12) are mapped to this event.
-              </p>
-
-              <div className="space-y-3">
-                {activeFeedbackQuestions.map((q, idx) => (
-                  <div key={q.id || idx} className="p-3.5 rounded-xl bg-black border border-purple-500/30 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-amber-300 text-xs">Question {idx + 1} ({q.type})</span>
-                      <div className="flex items-center gap-1">
-                        {q.po_mapping.map((p) => (
-                          <span key={p} className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 text-[11px] font-mono font-bold">
-                            {p}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <input
-                      type="text"
-                      value={q.title}
-                      onChange={(e) => {
-                        const updatedList = [...activeFeedbackQuestions];
-                        updatedList[idx] = { ...updatedList[idx], title: e.target.value };
-                        setActiveFeedbackQuestions(updatedList);
-                      }}
-                      className="w-full bg-slate-950 border border-white/20 rounded-lg p-2 text-xs text-white font-semibold focus:outline-none focus:border-purple-400"
-                    />
-                    <textarea
-                      rows={2}
-                      value={q.description}
-                      onChange={(e) => {
-                        const updatedList = [...activeFeedbackQuestions];
-                        updatedList[idx] = { ...updatedList[idx], description: e.target.value };
-                        setActiveFeedbackQuestions(updatedList);
-                      }}
-                      className="w-full bg-slate-950 border border-white/10 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-purple-400"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-purple-500/20 flex items-center justify-between shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  const defaults = generateDefaultFeedbackQuestions(event);
-                  setActiveFeedbackQuestions(defaults);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
-              >
-                Reset to Event Defaults
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCustomizeQuestionsOpen(false)}
-                  className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow"
-                >
-                  Save &amp; Close
-                </button>
-              </div>
             </div>
           </div>
         </div>

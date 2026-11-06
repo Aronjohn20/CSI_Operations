@@ -65,7 +65,9 @@ const LIKERT_CHOICES = [
  * Automatically aligns with the event's type (Contest, Workshop, Seminar, Hackathon, or General Technical Event).
  */
 export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuestion[] {
-  const text = `${event.event_name} ${event.brief_description}`.toLowerCase();
+  const name = event.event_name;
+  const desc = event.brief_description || "technical event organized by CSI Student Branch RSET";
+  const text = `${name} ${desc}`.toLowerCase();
 
   const isContest =
     text.includes("contest") ||
@@ -73,6 +75,8 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
     text.includes("heist") ||
     text.includes("challenge") ||
     text.includes("competition") ||
+    text.includes("glitch") ||
+    text.includes("game") ||
     text.includes("quiz");
 
   const isWorkshop =
@@ -94,7 +98,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q1",
         title: "Overall Coordination and Organization",
-        description: `The event was well organized, and the instructions, schedule, and overall coordination were clear and effective throughout the contest. [PO10, PO11]`,
+        description: `The event was well organized, and the instructions, schedule, and overall coordination were clear and effective throughout ${name}. [PO10, PO11]`,
         po_mapping: ["PO10", "PO11"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -102,8 +106,8 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       },
       {
         id: "q2",
-        title: "Quality of the Coding Contest",
-        description: `The coding problems were well designed with an appropriate level of difficulty and provided a meaningful problem-solving experience. [PO2]`,
+        title: `Quality of ${name}`,
+        description: `The problems and challenges were well designed with an appropriate level of difficulty and provided a meaningful problem-solving experience. [PO2]`,
         po_mapping: ["PO2"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -112,7 +116,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q3",
         title: "Improvement in Problem-Solving Skills",
-        description: `The contest enhanced my ability to analyze problems and develop logical, efficient solutions. [PO1, PO2]`,
+        description: `${name} enhanced my ability to analyze problems, debug issues, and develop logical, efficient solutions. [PO1, PO2]`,
         po_mapping: ["PO1", "PO2"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -121,7 +125,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q4",
         title: "Application of Programming Knowledge",
-        description: `The contest provided an opportunity to apply programming concepts, data structures, and algorithms to solve coding challenges effectively. [PO1, PO3]`,
+        description: `${name} provided an opportunity to apply concepts, logic, and technical thinking to solve challenges effectively. [PO1, PO3]`,
         po_mapping: ["PO1", "PO3"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -130,7 +134,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q5",
         title: "Critical Thinking and Time Management",
-        description: `The contest encouraged critical thinking, analytical reasoning, and effective time management while solving coding challenges. [PO2, PO4]`,
+        description: `${name} encouraged critical thinking, analytical reasoning, and effective time management while solving challenges. [PO2, PO4]`,
         po_mapping: ["PO2", "PO4"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -139,7 +143,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q6",
         title: "Motivation for Continuous Learning",
-        description: `Overall, the contest motivated me to further improve my programming, problem-solving, and competitive coding skills through continuous learning. [PO12]`,
+        description: `Overall, ${name} motivated me to further improve my technical and competitive skills through continuous learning. [PO12]`,
         po_mapping: ["PO12"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -162,7 +166,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q1",
         title: "Overall Coordination and Organization",
-        description: `The workshop was well organized, and the instructions, venue setup, and overall coordination were clear and helpful. [PO10, PO11]`,
+        description: `The workshop was well organized, and the instructions, venue setup, and overall coordination were clear and helpful throughout ${name}. [PO10, PO11]`,
         po_mapping: ["PO10", "PO11"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -170,7 +174,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       },
       {
         id: "q2",
-        title: "Quality and Content of the Workshop",
+        title: `Quality and Content of ${name}`,
         description: `The technical topics covered were practical, well-structured, and explained clearly by the resource persons. [PO1, PO2]`,
         po_mapping: ["PO1", "PO2"],
         choices: LIKERT_CHOICES,
@@ -180,7 +184,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q3",
         title: "Hands-on Practical Skills Acquired",
-        description: `The practical exercises enabled me to acquire hands-on experience and apply modern development tools directly. [PO1, PO5]`,
+        description: `The practical exercises in ${name} enabled me to acquire hands-on experience and apply modern development tools directly. [PO1, PO5]`,
         po_mapping: ["PO1", "PO5"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -189,7 +193,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q4",
         title: "Application of Technical Tools & Frameworks",
-        description: `The session provided an opportunity to design components and utilize modern engineering tools effectively. [PO3, PO5]`,
+        description: `${name} provided an opportunity to design components and utilize modern engineering tools effectively. [PO3, PO5]`,
         po_mapping: ["PO3", "PO5"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -198,7 +202,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q5",
         title: "Analytical Problem Solving & Troubleshooting",
-        description: `The workshop strengthened my ability to debug, troubleshoot, and solve real-world implementation challenges. [PO2, PO4]`,
+        description: `${name} strengthened my ability to debug, troubleshoot, and solve real-world implementation challenges. [PO2, PO4]`,
         po_mapping: ["PO2", "PO4"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -207,7 +211,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q6",
         title: "Motivation for Continuous Learning",
-        description: `Overall, the workshop motivated me to continue exploring this domain and build future practical projects. [PO12]`,
+        description: `Overall, ${name} motivated me to continue exploring this domain and build future practical projects. [PO12]`,
         po_mapping: ["PO12"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -230,7 +234,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q1",
         title: "Overall Coordination and Organization",
-        description: `The session was well managed, timely, and provided smooth coordination throughout. [PO10, PO11]`,
+        description: `The session was well managed, timely, and provided smooth coordination throughout ${name}. [PO10, PO11]`,
         po_mapping: ["PO10", "PO11"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -238,8 +242,8 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       },
       {
         id: "q2",
-        title: "Relevance and Depth of the Topic",
-        description: `The session addressed industry-relevant insights and provided deep conceptual clarity. [PO1, PO6]`,
+        title: `Relevance and Depth of ${name}`,
+        description: `The session addressed industry-relevant insights and provided deep conceptual clarity on the topic. [PO1, PO6]`,
         po_mapping: ["PO1", "PO6"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -248,7 +252,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q3",
         title: "Exposure to Modern Trends & Technologies",
-        description: `The talk introduced me to modern technological paradigms and real-world industrial tools. [PO5, PO12]`,
+        description: `${name} introduced me to modern technological paradigms and real-world industrial tools. [PO5, PO12]`,
         po_mapping: ["PO5", "PO12"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -257,7 +261,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
       {
         id: "q4",
         title: "Clarity and Effectiveness of Delivery",
-        description: `The speaker communicated complex ideas clearly and addressed attendee queries effectively. [PO10]`,
+        description: `The speaker in ${name} communicated complex ideas clearly and addressed attendee queries effectively. [PO10]`,
         po_mapping: ["PO10"],
         choices: LIKERT_CHOICES,
         type: "likert_scale",
@@ -298,7 +302,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
     {
       id: "q1",
       title: "Overall Coordination and Organization",
-      description: `The event was well organized, and the instructions, schedule, and overall coordination were clear and effective throughout the event. [PO10, PO11]`,
+      description: `The event was well organized, and the instructions, schedule, and overall coordination were clear and effective throughout ${name}. [PO10, PO11]`,
       po_mapping: ["PO10", "PO11"],
       choices: LIKERT_CHOICES,
       type: "likert_scale",
@@ -306,7 +310,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
     },
     {
       id: "q2",
-      title: `Quality of the ${event.event_name}`,
+      title: `Quality of ${name}`,
       description: `The event activities and challenges were well designed with an appropriate level of difficulty and provided a meaningful experience. [PO2]`,
       po_mapping: ["PO2"],
       choices: LIKERT_CHOICES,
@@ -316,7 +320,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
     {
       id: "q3",
       title: "Improvement in Problem-Solving Skills",
-      description: `The event enhanced my ability to analyze practical problems and develop logical, efficient solutions. [PO1, PO2]`,
+      description: `${name} enhanced my ability to analyze practical problems and develop logical, efficient solutions. [PO1, PO2]`,
       po_mapping: ["PO1", "PO2"],
       choices: LIKERT_CHOICES,
       type: "likert_scale",
@@ -325,7 +329,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
     {
       id: "q4",
       title: "Application of Technical Knowledge",
-      description: `The event provided an opportunity to apply engineering concepts, techniques, and skills effectively. [PO1, PO3]`,
+      description: `${name} provided an opportunity to apply engineering concepts, techniques, and skills effectively. [PO1, PO3]`,
       po_mapping: ["PO1", "PO3"],
       choices: LIKERT_CHOICES,
       type: "likert_scale",
@@ -334,7 +338,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
     {
       id: "q5",
       title: "Critical Thinking and Time Management",
-      description: `The event encouraged critical thinking, analytical reasoning, and effective time management while participating. [PO2, PO4]`,
+      description: `${name} encouraged critical thinking, analytical reasoning, and effective time management while participating. [PO2, PO4]`,
       po_mapping: ["PO2", "PO4"],
       choices: LIKERT_CHOICES,
       type: "likert_scale",
@@ -343,7 +347,7 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
     {
       id: "q6",
       title: "Motivation for Continuous Learning",
-      description: `Overall, the event motivated me to further improve my technical and professional skills through continuous learning. [PO12]`,
+      description: `Overall, ${name} motivated me to further improve my technical and professional skills through continuous learning. [PO12]`,
       po_mapping: ["PO12"],
       choices: LIKERT_CHOICES,
       type: "likert_scale",

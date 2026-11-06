@@ -2,18 +2,24 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const webhookUrl = process.env.NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL;
+    const payload = await req.json();
+    const action = payload.action || "";
+
+    // Allow dedicated feedback webhook URL if provided, otherwise fallback to master CSI webhook
+    const webhookUrl =
+      (action.includes("feedback") && process.env.NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL)
+        ? process.env.NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL
+        : (process.env.NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL || process.env.NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL);
+
     if (!webhookUrl) {
       return NextResponse.json(
         {
           success: false,
-          error: "NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL is not configured in .env.local",
+          error: "Neither NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL nor NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL is configured in .env.local",
         },
         { status: 500 }
       );
     }
-
-    const payload = await req.json();
 
     // Call Google Apps Script Web App
     const response = await fetch(webhookUrl, {
