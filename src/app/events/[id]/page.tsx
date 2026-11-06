@@ -399,9 +399,11 @@ export default function EventContainerPage() {
     if (event) {
       setActiveFeedbackQuestions(generateDefaultFeedbackQuestions(event));
       if (event.winners) {
-        setFirstPlaceWinner(event.winners.first_place || "");
-        setSecondPlaceWinner(event.winners.second_place || "");
-        setThirdPlaceWinner(event.winners.third_place || "");
+        const toFirstStr = (val?: string | string[]) =>
+          Array.isArray(val) ? (val[0] || "") : (val || "");
+        setFirstPlaceWinner(toFirstStr(event.winners.first_place));
+        setSecondPlaceWinner(toFirstStr(event.winners.second_place));
+        setThirdPlaceWinner(toFirstStr(event.winners.third_place));
       }
 
       const targetUrl = event.feedback_google_form_url || `https://forms.gle/csi-feedback-${event.id}`;
@@ -1703,10 +1705,20 @@ export default function EventContainerPage() {
                       ) : (
                         <>
                           <RefreshCw className="w-5 h-5" />
-                          <span>Sync Responses to Certificates</span>
+                          <span>Sync Sheet Responses</span>
                         </>
                       )}
                     </button>
+
+                    {/* Open Certificate Studio in New Dedicated Page */}
+                    <Link
+                      href={`/events/${event.id}/certificates`}
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-600 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-white text-[16px] font-extrabold flex items-center gap-2 transition shadow-lg shadow-amber-600/30"
+                      title="Open Certificate Studio to assign winners, upload templates, and download ZIP folders"
+                    >
+                      <Trophy className="w-5 h-5 text-amber-200" />
+                      <span>Certificate Studio &rarr;</span>
+                    </Link>
 
                     {/* Toggle Feedback Status */}
                     <button
@@ -1735,6 +1747,36 @@ export default function EventContainerPage() {
               </button>
             </div>
           </div>
+
+        {/* Phase 5: Certificate Generation Studio Banner */}
+        <div className="bg-gradient-to-r from-amber-950/40 via-purple-950/40 to-[#12101C] rounded-2xl border border-amber-500/40 p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                Phase 5 • Next Step
+              </span>
+              {event.feedback_attendees && event.feedback_attendees.length > 0 && (
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                  {event.feedback_attendees.length} Verified Attendees Synced
+                </span>
+              )}
+            </div>
+            <h3 className="text-xl font-extrabold text-white flex items-center gap-2 pt-1">
+              <Trophy className="w-6 h-6 text-amber-400" />
+              Certificate Generation &amp; Winner Recognition Studio
+            </h3>
+            <p className="text-slate-300 text-[15px]">
+              Multi-select 1st, 2nd, and 3rd place winners, upload custom templates for Appreciation &amp; Participation, customize write-ups, and download the two organized zip folders.
+            </p>
+          </div>
+          <Link
+            href={`/events/${event.id}/certificates`}
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-purple-600 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white text-[16px] font-extrabold flex items-center justify-center gap-2.5 transition shadow-xl shadow-amber-600/25 shrink-0"
+          >
+            <span>Open Certificate Studio</span>
+            <Award className="w-5 h-5" />
+          </Link>
+        </div>
 
         {/* Attendance Sheet */}
         <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-5 shadow-xl">

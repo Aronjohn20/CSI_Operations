@@ -93,9 +93,17 @@ export interface CSIEvent {
   is_feedback_closed?: boolean;
   feedback_attendees?: FeedbackAttendee[];
   winners?: {
-    first_place?: string; // attendee UID or Name
-    second_place?: string;
-    third_place?: string;
+    first_place?: string | string[]; // attendee UID(s) or Name(s) - multi-select supported
+    second_place?: string | string[];
+    third_place?: string | string[];
+  };
+  certificate_templates?: {
+    appreciation_template_data?: string; // Base64 data URL
+    participation_template_data?: string;
+  };
+  certificate_writeups?: {
+    appreciation_writeup?: string;
+    participation_writeup?: string;
   };
   custom_feedback_questions?: FeedbackQuestion[];
 }
