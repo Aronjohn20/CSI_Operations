@@ -68,6 +68,76 @@ export function getWinnerPosition(
 }
 
 /**
+ * Parses an uploaded PPTX template file:
+ * - Stores the raw PPTX bytes for dynamic <<name>> replacement
+ * - Extracts the main certificate background graphic from ppt/media/ for visual preview & PDF rendering
+ */
+export async function extractPptxData(file: File): Promise<{
+  pptxBuffer: ArrayBuffer;
+  previewImageBase64?: string;
+  fileName: string;
+}> {
+  const buffer = await file.arrayBuffer();
+  let previewImageBase64: string | undefined = undefined;
+
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const mediaFiles = Object.keys(zip.files).filter(
+      (f) => f.startsWith("ppt/media/") && !zip.files[f].dir
+    );
+
+    let maxLen = 0;
+    for (const m of mediaFiles) {
+      const data = await zip.files[m].async("base64");
+      if (data.length > maxLen) {
+        maxLen = data.length;
+        const ext = m.toLowerCase().endsWith(".png") ? "png" : "jpeg";
+        previewImageBase64 = `data:image/${ext};base64,${data}`;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not extract image from PPTX", err);
+  }
+
+  return {
+    pptxBuffer: buffer,
+    previewImageBase64,
+    fileName: file.name,
+  };
+}
+
+/**
+ * Creates a customized PPTX file by replacing <<name>> in slide XMLs
+ * Matches the exact Python python-pptx behavior!
+ */
+export async function createPptxWithName(
+  templatePptxBuffer: ArrayBuffer,
+  replacementName: string
+): Promise<ArrayBuffer> {
+  const zip = await JSZip.loadAsync(templatePptxBuffer);
+  const slideFiles = Object.keys(zip.files).filter(
+    (f) => f.startsWith("ppt/slides/slide") && f.endsWith(".xml")
+  );
+
+  for (const slidePath of slideFiles) {
+    let xml = await zip.file(slidePath)!.async("text");
+
+    // Replace standard placeholder tags: <<name>>, &lt;&lt;name&gt;&gt;, <name>, {name}
+    xml = xml.replace(/(<<name>>|&lt;&lt;name&gt;&gt;|<name>|&lt;name&gt;|\{\{name\}\}|\{name\})/gi, replacementName);
+
+    // If PowerPoint split <<name>> across XML text runs
+    const splitRegex = /(&lt;&lt;|<<)(?:(?!&gt;&gt;|>>)(?:[\s\S]))*?name(?:(?!&gt;&gt;|>>)(?:[\s\S]))*?(&gt;&gt;|>>)/gi;
+    if (splitRegex.test(xml)) {
+      xml = xml.replace(splitRegex, replacementName);
+    }
+
+    zip.file(slidePath, xml);
+  }
+
+  return await zip.generateAsync({ type: "arraybuffer" });
+}
+
+/**
  * Draws an official high-resolution CSI SB RSET Certificate on a jsPDF instance (Landscape A4)
  * Based on the Python script logic: The only dynamic element is the formatted participant name
  * stamped onto the selected template!
@@ -311,93 +381,6 @@ export function exportSingleCertificatePdf(info: CertificateInfo) {
 }
 
 /**
- * Batch exports certificates into two separate ZIP folders (Winners Appreciation vs Participation)
- * Matches Python output_dir structure: Generates {Formatted_Name}.pdf inside the zip
- */
-export async function exportCertificatesZip(
-  type: "winners" | "participation",
-  attendees: FeedbackAttendee[],
-  eventName: string,
-  eventDate: string,
-  venue: string,
-  winners?: {
-    first_place?: string | string[];
-    second_place?: string | string[];
-    third_place?: string | string[];
-  },
-  templateImage?: string,
-  facultyCoordinator?: string
-): Promise<number> {
-  const zip = new JSZip();
-
-  const targetAttendees = attendees.filter((att) => {
-    const pos = getWinnerPosition(att, winners);
-    if (type === "winners") {
-      return pos === "1st" || pos === "2nd" || pos === "3rd";
-    }
-    return pos === "participant";
-  });
-
-  if (targetAttendees.length === 0) {
-    throw new Error(
-      type === "winners"
-        ? "No winners selected yet. Please select 1st, 2nd, or 3rd place winners."
-        : "No participants found in the feedback response list."
-    );
-  }
-
-  for (let i = 0; i < targetAttendees.length; i++) {
-    const att = targetAttendees[i];
-    const pos = getWinnerPosition(att, winners);
-
-    const doc = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    });
-
-    renderCertificatePage(
-      doc,
-      {
-        attendee: att,
-        eventName,
-        eventDate,
-        venue,
-        position: pos,
-        facultyCoordinator,
-        templateImage,
-      },
-      0,
-      1
-    );
-
-    const pdfData = doc.output("arraybuffer");
-    const formattedName = formatCertificateName(att.name);
-    const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
-
-    // Exactly like the python script: {name}.pdf
-    const fileName = `${safeName}.pdf`;
-    zip.file(fileName, pdfData);
-  }
-
-  const blob = await zip.generateAsync({ type: "blob" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  const cleanEvent = eventName.replace(/[^a-zA-Z0-9_-]/g, "_");
-  a.download =
-    type === "winners"
-      ? `Winners_Appreciation_Certificates_${cleanEvent}.zip`
-      : `Participation_Certificates_${cleanEvent}.zip`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  return targetAttendees.length;
-}
-
-/**
  * Batch exports all certificates into a single consolidated PDF document
  */
 export function exportBatchCertificatesPdf(
@@ -442,4 +425,102 @@ export function exportBatchCertificatesPdf(
 
   const cleanEvent = eventName.replace(/[^a-zA-Z0-9_-]/g, "_");
   doc.save(`All_Certificates_${cleanEvent}.pdf`);
+}
+
+/**
+ * Batch exports certificates into two separate ZIP folders (Winners Appreciation vs Participation)
+ * Matches Python output_dir structure:
+ * - Generates {Formatted_Name}.pdf for each student
+ * - Also includes {Formatted_Name}.pptx if a template.pptx was uploaded!
+ */
+export async function exportCertificatesZip(
+  type: "winners" | "participation",
+  attendees: FeedbackAttendee[],
+  eventName: string,
+  eventDate: string,
+  venue: string,
+  winners?: {
+    first_place?: string | string[];
+    second_place?: string | string[];
+    third_place?: string | string[];
+  },
+  templateImage?: string,
+  templatePptxBuffer?: ArrayBuffer,
+  facultyCoordinator?: string
+): Promise<number> {
+  const zip = new JSZip();
+
+  const targetAttendees = attendees.filter((att) => {
+    const pos = getWinnerPosition(att, winners);
+    if (type === "winners") {
+      return pos === "1st" || pos === "2nd" || pos === "3rd";
+    }
+    return pos === "participant";
+  });
+
+  if (targetAttendees.length === 0) {
+    throw new Error(
+      type === "winners"
+        ? "No winners selected yet. Please select 1st, 2nd, or 3rd place winners."
+        : "No participants found in the feedback response list."
+    );
+  }
+
+  for (let i = 0; i < targetAttendees.length; i++) {
+    const att = targetAttendees[i];
+    const pos = getWinnerPosition(att, winners);
+    const formattedName = formatCertificateName(att.name);
+    const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
+
+    // 1. Generate {name}.pdf
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+
+    renderCertificatePage(
+      doc,
+      {
+        attendee: att,
+        eventName,
+        eventDate,
+        venue,
+        position: pos,
+        facultyCoordinator,
+        templateImage,
+      },
+      0,
+      1
+    );
+
+    const pdfData = doc.output("arraybuffer");
+    zip.file(`${safeName}.pdf`, pdfData);
+
+    // 2. If a PPTX template was uploaded, generate the modified {name}.pptx
+    if (templatePptxBuffer) {
+      try {
+        const pptxData = await createPptxWithName(templatePptxBuffer, formattedName);
+        zip.file(`${safeName}.pptx`, pptxData);
+      } catch (err) {
+        console.warn(`Could not generate PPTX for ${safeName}`, err);
+      }
+    }
+  }
+
+  const blob = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const cleanEvent = eventName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  a.download =
+    type === "winners"
+      ? `Winners_Appreciation_Certificates_${cleanEvent}.zip`
+      : `Participation_Certificates_${cleanEvent}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  return targetAttendees.length;
 }

@@ -15,7 +15,7 @@ import {
   Eye,
   RotateCcw,
   X,
-  Users,
+  FileCode,
 } from "lucide-react";
 import { CSIEvent, FeedbackAttendee } from "@/lib/types";
 import { getEventById, updateEvent } from "@/lib/eventsStorage";
@@ -23,6 +23,7 @@ import {
   exportCertificatesZip,
   getWinnerPosition,
   formatCertificateName,
+  extractPptxData,
 } from "@/lib/certificateExport";
 import {
   mapGoogleSheetToFeedbackAttendees,
@@ -49,7 +50,17 @@ export default function CertificateStudioPage() {
   const [secondPlaceWinners, setSecondPlaceWinners] = useState<string[]>([]);
   const [thirdPlaceWinners, setThirdPlaceWinners] = useState<string[]>([]);
 
-  // Template Uploads (Base64 data URLs)
+  // PPTX Templates (Raw ArrayBuffer & File info for <<name>> replacement)
+  const [appreciationPptxFile, setAppreciationPptxFile] = useState<{
+    buffer: ArrayBuffer;
+    name: string;
+  } | null>(null);
+  const [participationPptxFile, setParticipationPptxFile] = useState<{
+    buffer: ArrayBuffer;
+    name: string;
+  } | null>(null);
+
+  // Preview Templates (Base64 data URLs extracted from PPTX or images)
   const [appreciationTemplate, setAppreciationTemplate] = useState<string>("");
   const [participationTemplate, setParticipationTemplate] = useState<string>("");
 
@@ -203,47 +214,95 @@ export default function CertificateStudioPage() {
     }
   };
 
-  // Template Upload Handler
-  const handleTemplateUpload = (
+  // Template Upload Handler - Supports .pptx (PowerPoint) and image files
+  const handleTemplateUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     type: "appreciation" | "participation"
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      alert("Please upload a valid image file (PNG, JPG, or JPEG).");
+    const isPptx =
+      file.name.toLowerCase().endsWith(".pptx") ||
+      file.name.toLowerCase().endsWith(".ppt") ||
+      file.type.includes("presentationml");
+
+    if (isPptx) {
+      try {
+        const { pptxBuffer, previewImageBase64, fileName } = await extractPptxData(file);
+
+        if (type === "appreciation") {
+          setAppreciationPptxFile({ buffer: pptxBuffer, name: fileName });
+          if (previewImageBase64) {
+            setAppreciationTemplate(previewImageBase64);
+            saveEventChanges(
+              firstPlaceWinners,
+              secondPlaceWinners,
+              thirdPlaceWinners,
+              previewImageBase64,
+              participationTemplate
+            );
+          }
+        } else {
+          setParticipationPptxFile({ buffer: pptxBuffer, name: fileName });
+          if (previewImageBase64) {
+            setParticipationTemplate(previewImageBase64);
+            saveEventChanges(
+              firstPlaceWinners,
+              secondPlaceWinners,
+              thirdPlaceWinners,
+              appreciationTemplate,
+              previewImageBase64
+            );
+          }
+        }
+
+        setStatusNotice({
+          type: "success",
+          text: `PowerPoint template "${fileName}" loaded successfully! Dynamic <<name>> replacement ready.`,
+        });
+      } catch (err: any) {
+        setStatusNotice({
+          type: "error",
+          text: `Could not process PowerPoint file: ${err.message}`,
+        });
+      }
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      if (type === "appreciation") {
-        setAppreciationTemplate(result);
-        saveEventChanges(
-          firstPlaceWinners,
-          secondPlaceWinners,
-          thirdPlaceWinners,
-          result,
-          participationTemplate
-        );
-      } else {
-        setParticipationTemplate(result);
-        saveEventChanges(
-          firstPlaceWinners,
-          secondPlaceWinners,
-          thirdPlaceWinners,
-          appreciationTemplate,
-          result
-        );
-      }
-      setStatusNotice({
-        type: "success",
-        text: `Template for ${type === "appreciation" ? "Appreciation" : "Participation"} updated successfully!`,
-      });
-    };
-    reader.readAsDataURL(file);
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        if (type === "appreciation") {
+          setAppreciationTemplate(result);
+          saveEventChanges(
+            firstPlaceWinners,
+            secondPlaceWinners,
+            thirdPlaceWinners,
+            result,
+            participationTemplate
+          );
+        } else {
+          setParticipationTemplate(result);
+          saveEventChanges(
+            firstPlaceWinners,
+            secondPlaceWinners,
+            thirdPlaceWinners,
+            appreciationTemplate,
+            result
+          );
+        }
+        setStatusNotice({
+          type: "success",
+          text: `Template image for ${type === "appreciation" ? "Appreciation" : "Participation"} updated successfully!`,
+        });
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    alert("Please upload a valid .pptx PowerPoint file or an image template.");
   };
 
   // Winner Toggle Logic
@@ -303,6 +362,7 @@ export default function CertificateStudioPage() {
         event.venue,
         winnersObject,
         appreciationTemplate || undefined,
+        appreciationPptxFile?.buffer,
         event.faculty_in_charge
       );
       setStatusNotice({
@@ -334,6 +394,7 @@ export default function CertificateStudioPage() {
         event.venue,
         winnersObject,
         participationTemplate || undefined,
+        participationPptxFile?.buffer,
         event.faculty_in_charge
       );
       setStatusNotice({
@@ -588,7 +649,7 @@ export default function CertificateStudioPage() {
         </div>
       )}
 
-      {/* TEMPLATE UPLOAD BOXES (CLEAN - NO WRITE-UP TEXT OR TOKEN BOILERPLATE) */}
+      {/* PPTX TEMPLATE UPLOAD BOXES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         {/* Appreciation Template Box */}
         <div className="bg-[#12101C] rounded-2xl border border-amber-500/30 p-5 space-y-3 shadow-xl">
@@ -597,10 +658,11 @@ export default function CertificateStudioPage() {
               <Trophy className="w-4 h-4 text-amber-400" />
               Certificate of Appreciation
             </h3>
-            {appreciationTemplate && (
+            {(appreciationPptxFile || appreciationTemplate) && (
               <button
                 onClick={() => {
                   setAppreciationTemplate("");
+                  setAppreciationPptxFile(null);
                   saveEventChanges(firstPlaceWinners, secondPlaceWinners, thirdPlaceWinners, "");
                 }}
                 className="text-xs text-red-400 hover:text-white flex items-center gap-1 font-bold"
@@ -613,14 +675,16 @@ export default function CertificateStudioPage() {
 
           <label className="flex items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-amber-500/50 hover:border-amber-400 bg-black/40 text-amber-200 text-xs font-bold cursor-pointer transition">
             <Upload className="w-4 h-4 text-amber-400" />
-            <span>
-              {appreciationTemplate
-                ? "Replace Appreciation Template (PNG / JPG)"
-                : "Upload Appreciation Template (PNG / JPG)"}
+            <span className="truncate">
+              {appreciationPptxFile
+                ? `Loaded: ${appreciationPptxFile.name}`
+                : appreciationTemplate
+                ? "Replace Template (.pptx)"
+                : "Upload Appreciation Template (.pptx)"}
             </span>
             <input
               type="file"
-              accept="image/png, image/jpeg"
+              accept=".pptx, .ppt, application/vnd.openxmlformats-officedocument.presentationml.presentation, image/png, image/jpeg"
               className="hidden"
               onChange={(e) => handleTemplateUpload(e, "appreciation")}
             />
@@ -634,10 +698,11 @@ export default function CertificateStudioPage() {
               <Award className="w-4 h-4 text-cyan-400" />
               Certificate of Participation
             </h3>
-            {participationTemplate && (
+            {(participationPptxFile || participationTemplate) && (
               <button
                 onClick={() => {
                   setParticipationTemplate("");
+                  setParticipationPptxFile(null);
                   saveEventChanges(
                     firstPlaceWinners,
                     secondPlaceWinners,
@@ -656,14 +721,16 @@ export default function CertificateStudioPage() {
 
           <label className="flex items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-cyan-500/50 hover:border-cyan-400 bg-black/40 text-cyan-200 text-xs font-bold cursor-pointer transition">
             <Upload className="w-4 h-4 text-cyan-400" />
-            <span>
-              {participationTemplate
-                ? "Replace Participation Template (PNG / JPG)"
-                : "Upload Participation Template (PNG / JPG)"}
+            <span className="truncate">
+              {participationPptxFile
+                ? `Loaded: ${participationPptxFile.name}`
+                : participationTemplate
+                ? "Replace Template (.pptx)"
+                : "Upload Participation Template (.pptx)"}
             </span>
             <input
               type="file"
-              accept="image/png, image/jpeg"
+              accept=".pptx, .ppt, application/vnd.openxmlformats-officedocument.presentationml.presentation, image/png, image/jpeg"
               className="hidden"
               onChange={(e) => handleTemplateUpload(e, "participation")}
             />
@@ -749,7 +816,7 @@ export default function CertificateStudioPage() {
                 </h1>
               </div>
             ) : (
-              // Default template layout when no custom image is uploaded
+              // Default template layout when no custom image or PPTX is uploaded
               <div className="w-full h-full p-8 flex flex-col justify-between relative">
                 <div className="absolute inset-3 border-[3px] border-[#18122B] pointer-events-none">
                   <div className="absolute inset-1.5 border border-[#D97706]" />
