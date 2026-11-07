@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Calendar } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/components/ThemeContext";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
 
   const navItems = [
     { name: "Overview", href: "/", icon: LayoutDashboard },
@@ -14,7 +16,7 @@ export default function Navbar() {
   ];
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-60 bg-csi-sidebar border-r border-csi-border flex flex-col z-50">
+    <aside className="fixed top-0 left-0 h-screen w-60 bg-csi-sidebar border-r border-csi-border flex flex-col z-50 transition-colors duration-200">
       {/* Brand */}
       <div className="px-5 py-6 border-b border-csi-border">
         <div className="flex items-center space-x-3">
@@ -52,8 +54,32 @@ export default function Navbar() {
         })}
       </nav>
 
+      {/* Theme Switcher */}
+      <div className="px-4 py-3 border-t border-csi-border">
+        <button
+          onClick={toggleTheme}
+          type="button"
+          aria-label="Toggle dark/light theme"
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-csi-surface hover:bg-csi-surfaceLight text-csi-text transition text-xs font-bold border border-csi-border shadow-sm group"
+        >
+          <div className="flex items-center gap-2">
+            {theme === "light" ? (
+              <Sun className="w-4 h-4 text-amber-500 transition-transform group-hover:rotate-45" />
+            ) : (
+              <Moon className="w-4 h-4 text-purple-400 transition-transform group-hover:-rotate-12" />
+            )}
+            <span className="text-xs font-semibold">
+              {theme === "light" ? "Light Mode" : "Dark Mode"}
+            </span>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300">
+            Switch
+          </span>
+        </button>
+      </div>
+
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-csi-border">
+      <div className="px-5 py-3 border-t border-csi-border">
         <p className="text-xs text-csi-textDim font-mono">CSI Operations v1.2</p>
       </div>
     </aside>

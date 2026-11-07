@@ -7,6 +7,12 @@
   --foreground: #ffffff;
 }
 
+html.light,
+[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
 html {
   font-size: 18px;
 }
@@ -30,4 +36,219 @@ input, select, textarea, button {
 pre, code {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 18px;
+}
+
+/* ========================================================
+   LIGHT MODE STYLING OVERRIDES (Crisp, High-Contrast Theme)
+   ======================================================== */
+
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Sidebar & Navigation */
+html.light aside,
+html.light .bg-csi-sidebar {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .border-csi-border {
+  border-color: #e2e8f0 !important;
+}
+
+/* Card & Surface Overrides */
+html.light .bg-\[\#12101C\],
+html.light .bg-\[\#0E0C17\],
+html.light .bg-\[\#0B0912\],
+html.light .bg-\[\#0E0C16\],
+html.light .bg-csi-surface {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.02) !important;
+}
+
+html.light .bg-csi-surfaceLight {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-black {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .bg-black\/60,
+html.light .bg-black\/70,
+html.light .bg-black\/80,
+html.light .bg-black\/90 {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Modals & Backdrop */
+html.light .fixed.inset-0.bg-black\/80,
+html.light .fixed.inset-0.bg-black\/85 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+/* Typography Overrides */
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200,
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .text-csi-text {
+  color: #0f172a !important;
+}
+
+html.light .text-csi-textMuted {
+  color: #475569 !important;
+}
+
+html.light .text-csi-textDim {
+  color: #64748b !important;
+}
+
+/* Keep text white on primary colored buttons/actions */
+html.light [class*="bg-purple-600"],
+html.light [class*="bg-purple-700"],
+html.light [class*="bg-emerald-600"],
+html.light [class*="bg-teal-600"],
+html.light [class*="bg-blue-600"],
+html.light [class*="bg-indigo-600"],
+html.light [class*="bg-red-600"],
+html.light [class*="bg-red-700"],
+html.light [class*="bg-csi-purple"],
+html.light [class*="from-purple-600"],
+html.light [class*="from-emerald-600"],
+html.light [class*="from-indigo-600"],
+html.light [class*="from-blue-600"],
+html.light [class*="from-amber-500"] {
+  color: #ffffff !important;
+}
+
+html.light [class*="bg-purple-600"] *,
+html.light [class*="bg-purple-700"] *,
+html.light [class*="bg-emerald-600"] *,
+html.light [class*="bg-teal-600"] *,
+html.light [class*="bg-blue-600"] *,
+html.light [class*="bg-indigo-600"] *,
+html.light [class*="bg-red-600"] *,
+html.light [class*="bg-red-700"] *,
+html.light [class*="bg-csi-purple"] *,
+html.light [class*="from-purple-600"] *,
+html.light [class*="from-emerald-600"] *,
+html.light [class*="from-indigo-600"] *,
+html.light [class*="from-blue-600"] *,
+html.light [class*="from-amber-500"] * {
+  color: #ffffff !important;
+}
+
+/* Inputs, Selects, & Textareas in Light Mode */
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light input:focus,
+html.light select:focus,
+html.light textarea:focus {
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Subtle Borders */
+html.light .border-purple-500\/20,
+html.light .border-purple-500\/30,
+html.light .border-purple-500\/40,
+html.light .border-purple-500\/50 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .divide-purple-500\/20 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #f1f5f9 !important;
+}
+
+/* Tables in Light Mode */
+html.light thead tr {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+html.light tbody tr.bg-\[\#12101C\] {
+  background-color: #ffffff !important;
+}
+
+html.light tbody tr.bg-\[\#0E0C16\] {
+  background-color: #fafafa !important;
+}
+
+/* Badges & Pills in Light Mode */
+html.light .bg-green-500\/20,
+html.light .bg-emerald-500\/20,
+html.light .bg-emerald-500\/15 {
+  background-color: #d1fae5 !important;
+  border-color: #6ee7b7 !important;
+  color: #065f46 !important;
+}
+
+html.light .bg-purple-500\/20,
+html.light .bg-purple-900\/40,
+html.light .bg-purple-950\/40 {
+  background-color: #ede9fe !important;
+  border-color: #c4b5fd !important;
+  color: #5b21b6 !important;
+}
+
+html.light .bg-amber-500\/20 {
+  background-color: #fef3c7 !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+}
+
+html.light .bg-blue-500\/20,
+html.light .bg-cyan-500\/20 {
+  background-color: #e0f2fe !important;
+  border-color: #7dd3fc !important;
+  color: #075985 !important;
+}
+
+html.light .bg-red-500\/20,
+html.light .bg-red-950\/40 {
+  background-color: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+  color: #991b1b !important;
+}
+
+/* Gradient Cards in Light Mode */
+html.light .bg-gradient-to-r.from-purple-950\/40,
+html.light .bg-gradient-to-r.from-blue-950\/40 {
+  background-image: linear-gradient(to right, #f5f3ff, #ede9fe, #ffffff) !important;
+  border-color: #ddd6fe !important;
 }
