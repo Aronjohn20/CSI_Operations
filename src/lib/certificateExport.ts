@@ -911,24 +911,25 @@ export async function generateCoordinatorCertificateDataUrl(
   const formattedDate = formatOrdinalDate(event.event_date);
 
   // If custom template image is uploaded, clear any placeholder name and writeup areas
-  // using the template's background color so new dynamic values replace them cleanly!
+  // using pure white / clean background color so new dynamic values replace them cleanly!
   if (customTemplateImage) {
+    let clearColor = "#FFFFFF";
     try {
-      const sample = ctx.getImageData(512, 336, 1, 1).data;
-      if (sample && sample[3] > 0) {
-        ctx.fillStyle = `rgb(${sample[0]}, ${sample[1]}, ${sample[2]})`;
-      } else {
-        ctx.fillStyle = "#FFFFFF";
+      // Sample clean background area away from any text
+      const sample = ctx.getImageData(300, 300, 1, 1).data;
+      if (sample && sample[0] > 220 && sample[1] > 220 && sample[2] > 220) {
+        clearColor = `rgb(${sample[0]}, ${sample[1]}, ${sample[2]})`;
       }
     } catch {
-      ctx.fillStyle = "#FFFFFF";
+      clearColor = "#FFFFFF";
     }
 
+    ctx.fillStyle = clearColor;
     // Clear name placeholder area (e.g. "[Coordinator Name]", "[Name]", etc.)
-    ctx.fillRect(160, 325, 704, 75);
+    ctx.fillRect(140, 320, 744, 82);
 
     // Clear writeup placeholder area (e.g. "[Event Name]", "[Date]", etc.)
-    ctx.fillRect(160, 422, 704, 96);
+    ctx.fillRect(140, 422, 744, 100);
   }
 
   // 2. Render Coordinator Name in gold script font (Default official template)
