@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import { CSIEvent, FeedbackAttendee, FeedbackQuestion } from "./types";
 import { getDepartmentChoices } from "./formScriptGenerator";
 
@@ -522,7 +523,99 @@ ${questionsScript}
 }
 
 /**
- * Intelligent parser that converts Google Sheet responses into typed FeedbackAttendee objects
+ * Parses raw CSV or TSV string into structured headers and rows
+ */
+export function parseCsvText(text: string): { headers: string[]; rows: string[][] } {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return { headers: [], rows: [] };
+
+  const parseLine = (line: string): string[] => {
+    const result: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    const delimiter = line.includes("\t") ? "\t" : ",";
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"' || char === "'") {
+        inQuotes = !inQuotes;
+      } else if (char === delimiter && !inQuotes) {
+        result.push(cur.trim());
+        cur = "";
+      } else {
+        cur += char;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  };
+
+  const headers = parseLine(lines[0]);
+  const rows = lines.slice(1).map(parseLine);
+  return { headers, rows };
+}
+
+/**
+ * Parses an Excel (.xlsx) file buffer directly using JSZip without external dependencies
+ */
+export async function parseXlsxBuffer(buffer: ArrayBuffer): Promise<{ headers: string[]; rows: string[][] }> {
+  const zip = await JSZip.loadAsync(buffer);
+
+  // 1. Shared strings table
+  const sharedStrings: string[] = [];
+  const sstFile = zip.file("xl/sharedStrings.xml");
+  if (sstFile) {
+    const sstXml = await sstFile.async("text");
+    const tRegex = /<t[^>]*>([\s\S]*?)<\/t>/g;
+    let tMatch: RegExpExecArray | null;
+    while ((tMatch = tRegex.exec(sstXml)) !== null) {
+      sharedStrings.push(
+        tMatch[1]
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+      );
+    }
+  }
+
+  // 2. Worksheet 1
+  const sheetFile = zip.file("xl/worksheets/sheet1.xml");
+  if (!sheetFile) throw new Error("Could not find sheet1.xml in Excel workbook.");
+  const sheetXml = await sheetFile.async("text");
+
+  const allRows: string[][] = [];
+  const rowRegex = /<row[^>]*>([\s\S]*?)<\/row>/g;
+  let rMatch: RegExpExecArray | null;
+
+  while ((rMatch = rowRegex.exec(sheetXml)) !== null) {
+    const rowXml = rMatch[1];
+    const cellRegex = /<c[^>]*?(?:\st="(s)")?[^>]*>(?:<v>([\s\S]*?)<\/v>)?<\/c>/g;
+    let cMatch: RegExpExecArray | null;
+    const rowData: string[] = [];
+
+    while ((cMatch = cellRegex.exec(rowXml)) !== null) {
+      const isShared = cMatch[1] === "s";
+      const val = cMatch[2] !== undefined ? cMatch[2] : "";
+      if (isShared && val !== "") {
+        rowData.push(sharedStrings[parseInt(val, 10)] || "");
+      } else {
+        rowData.push(val);
+      }
+    }
+    if (rowData.length > 0 && rowData.some((cell) => cell.trim() !== "")) {
+      allRows.push(rowData);
+    }
+  }
+
+  if (allRows.length === 0) return { headers: [], rows: [] };
+  const headers = allRows[0];
+  const rows = allRows.slice(1);
+  return { headers, rows };
+}
+
+/**
+ * Intelligent parser that converts Google Sheet or CSV/XLSX responses into typed FeedbackAttendee objects
  */
 export function mapGoogleSheetToFeedbackAttendees(
   headers: string[],
@@ -530,27 +623,39 @@ export function mapGoogleSheetToFeedbackAttendees(
 ): FeedbackAttendee[] {
   const normHeaders = headers.map((h) => String(h || "").trim().toLowerCase());
 
-  const nameIdx = normHeaders.findIndex(
-    (h) => h.includes("name (as required") || h.includes("certificate") || h === "name" || h.includes("student name")
+  let nameIdx = normHeaders.findIndex(
+    (h) =>
+      h.includes("name (as required") ||
+      h.includes("certificate") ||
+      h === "name" ||
+      h.includes("student name") ||
+      h.includes("participant name") ||
+      h.includes("full name")
   );
-  const uidIdx = normHeaders.findIndex((h) => h === "uid" || h.includes("roll") || h.includes("reg"));
+  if (nameIdx === -1) {
+    nameIdx = normHeaders.findIndex((h) => h.includes("name") && !h.includes("event"));
+  }
+  if (nameIdx === -1 && normHeaders.length > 0) {
+    // If no explicit 'name' column found, fallback to column 0 or 1
+    nameIdx = 0;
+  }
+
+  const uidIdx = normHeaders.findIndex(
+    (h) => h === "uid" || h.includes("roll") || h.includes("reg") || h.includes("admission") || h.includes("id")
+  );
   const emailIdx = normHeaders.findIndex(
-    (h) => h.includes("uid email") || h.includes("personal email") || h.includes("email")
+    (h) => h.includes("uid email") || h.includes("personal email") || h.includes("email") || h.includes("mail")
   );
   const genderIdx = normHeaders.findIndex((h) => h === "gender" || h.includes("sex") || h === "title");
-  const yearIdx = normHeaders.findIndex((h) => h.includes("year of study") || h.includes("year"));
+  const yearIdx = normHeaders.findIndex((h) => h.includes("year of study") || h.includes("year") || h.includes("sem"));
   const branchIdx = normHeaders.findIndex((h) => h === "branch" || h.includes("department") || h.includes("dept"));
-  const sectionIdx = normHeaders.findIndex((h) => h === "section" || h.includes("div"));
+  const sectionIdx = normHeaders.findIndex((h) => h === "section" || h.includes("div") || h.includes("class"));
   const whatsappIdx = normHeaders.findIndex(
-    (h) => h.includes("whatsapp") || h.includes("phone") || h.includes("contact")
+    (h) => h.includes("whatsapp") || h.includes("phone") || h.includes("contact") || h.includes("mobile")
   );
   const commentsIdx = normHeaders.findIndex(
-    (h) => h.includes("comments") || h.includes("suggestions") || h.includes("better")
+    (h) => h.includes("comments") || h.includes("suggestions") || h.includes("better") || h.includes("feedback")
   );
-
-  if (nameIdx === -1) {
-    throw new Error("Could not find 'Name (As required in the certificate)' in the uploaded sheet headers.");
-  }
 
   const attendees: FeedbackAttendee[] = [];
 

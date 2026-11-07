@@ -1,7 +1,8 @@
 import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import { RSET_LOGO_BASE64, CSI_LOGO_BASE64 } from "./logosBase64";
-import { FeedbackAttendee } from "./types";
+import { COORDINATOR_TEMPLATE_BASE64 } from "./coordinatorTemplateBase64";
+import { FeedbackAttendee, CSIEvent } from "./types";
 import { formatFullDateWithDay } from "./documentExport";
 
 export interface CertificateInfo {
@@ -46,19 +47,35 @@ export function getWinnerPosition(
 ): "1st" | "2nd" | "3rd" | "participant" {
   if (!winners) return "participant";
 
+  const clean = (s?: string) => (s ? s.trim().toLowerCase() : "");
+  const cleanFmt = (s?: string) => (s ? formatCertificateName(s).toLowerCase() : "");
+
+  const attUid = clean(attendee.uid);
+  const attName = clean(attendee.name);
+  const attFmtName = cleanFmt(attendee.name);
+  const attEmail = clean(attendee.email);
+
   const isMatch = (target?: string | string[]) => {
     if (!target) return false;
-    if (Array.isArray(target)) {
-      return target.some(
-        (t) =>
-          (attendee.uid && t.toLowerCase() === attendee.uid.toLowerCase()) ||
-          (attendee.name && t.toLowerCase() === attendee.name.toLowerCase())
+
+    const checkOne = (t: string) => {
+      if (!t) return false;
+      const ct = clean(t);
+      const cft = cleanFmt(t);
+      return (
+        (attUid && ct === attUid) ||
+        (attName && ct === attName) ||
+        (attFmtName && cft === attFmtName) ||
+        (attEmail && ct === attEmail) ||
+        (attName && (ct.includes(attName) || attName.includes(ct))) ||
+        (attFmtName && (cft.includes(attFmtName) || attFmtName.includes(cft)))
       );
+    };
+
+    if (Array.isArray(target)) {
+      return target.some(checkOne);
     }
-    return (
-      (attendee.uid && target.toLowerCase() === attendee.uid.toLowerCase()) ||
-      (attendee.name && target.toLowerCase() === attendee.name.toLowerCase())
-    );
+    return checkOne(target);
   };
 
   if (isMatch(winners.first_place)) return "1st";
@@ -68,9 +85,35 @@ export function getWinnerPosition(
 }
 
 /**
+ * Helper to convert an ArrayBuffer to a Base64 string
+ */
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Helper to convert a Base64 string to a Uint8Array
+ */
+export function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
  * Parses an uploaded PPTX template file:
- * - Stores the raw PPTX bytes for dynamic <<name>> replacement
- * - Extracts the main certificate background graphic from ppt/media/ for visual preview & PDF rendering
+ * - Stores the raw PPTX bytes for dynamic <<name>> & position replacement
+ * - Calls the local PowerPoint conversion API (/api/convert-pptx) to export a pristine 1080p preview of Slide 1
  */
 export async function extractPptxData(file: File): Promise<{
   pptxBuffer: ArrayBuffer;
@@ -80,23 +123,54 @@ export async function extractPptxData(file: File): Promise<{
   const buffer = await file.arrayBuffer();
   let previewImageBase64: string | undefined = undefined;
 
+  // 1. Try high-fidelity slide preview from PowerPoint COM via /api/convert-pptx
   try {
-    const zip = await JSZip.loadAsync(buffer);
-    const mediaFiles = Object.keys(zip.files).filter(
-      (f) => f.startsWith("ppt/media/") && !zip.files[f].dir
-    );
-
-    let maxLen = 0;
-    for (const m of mediaFiles) {
-      const data = await zip.files[m].async("base64");
-      if (data.length > maxLen) {
-        maxLen = data.length;
-        const ext = m.toLowerCase().endsWith(".png") ? "png" : "jpeg";
-        previewImageBase64 = `data:image/${ext};base64,${data}`;
-      }
+    const b64 = arrayBufferToBase64(buffer);
+    const res = await fetch("/api/convert-pptx", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "preview",
+        pptxBase64: b64,
+      }),
+    });
+    const data = await res.json();
+    if (data.success && data.previewImage) {
+      previewImageBase64 = data.previewImage;
     }
   } catch (err) {
-    console.warn("Could not extract image from PPTX", err);
+    console.warn("Could not fetch PowerPoint slide preview from API:", err);
+  }
+
+  // 2. Fallback: Only extract from ppt/media/ if it represents a full slide background
+  if (!previewImageBase64) {
+    try {
+      const zip = await JSZip.loadAsync(buffer);
+      const mediaFiles = Object.keys(zip.files).filter(
+        (f) => f.startsWith("ppt/media/") && !zip.files[f].dir
+      );
+
+      // Only pick if image is significant (e.g. background banner), avoid tiny logos
+      let maxLen = 0;
+      let candidateData: string | undefined = undefined;
+      let candidateExt = "jpeg";
+
+      for (const m of mediaFiles) {
+        const data = await zip.files[m].async("base64");
+        // An actual slide background image is generally > 80KB (base64 > 110,000 chars)
+        if (data.length > 100000 && data.length > maxLen) {
+          maxLen = data.length;
+          candidateExt = m.toLowerCase().endsWith(".png") ? "png" : "jpeg";
+          candidateData = data;
+        }
+      }
+
+      if (candidateData) {
+        previewImageBase64 = `data:image/${candidateExt};base64,${candidateData}`;
+      }
+    } catch (err) {
+      console.warn("Could not extract image from PPTX", err);
+    }
   }
 
   return {
@@ -107,12 +181,84 @@ export async function extractPptxData(file: File): Promise<{
 }
 
 /**
- * Creates a customized PPTX file by replacing <<name>> in slide XMLs
+ * Replaces placement positions in slide OpenXML (1st place, 2nd place, 3rd place, superscripts, placeholders)
+ */
+export function replacePositionInSlideXml(
+  xml: string,
+  position?: "1st" | "2nd" | "3rd" | "participant"
+): string {
+  if (!position || position === "participant") {
+    xml = xml.replace(
+      /(<<position>>|&lt;&lt;position&gt;&gt;|<position>|&lt;position&gt;|\{\{position\}\}|\{position\}|\[position\])/gi,
+      "Participant"
+    );
+    xml = xml.replace(
+      /(<<place>>|&lt;&lt;place&gt;&gt;|<place>|&lt;place&gt;|\{\{place\}\}|\{place\}|\[place\])/gi,
+      "Participant"
+    );
+    return xml;
+  }
+
+  const ordinal = position; // "1st", "2nd", "3rd"
+  const word = position === "1st" ? "first" : position === "2nd" ? "second" : "third";
+  const Word = position === "1st" ? "First" : position === "2nd" ? "Second" : "Third";
+  const num = position === "1st" ? "1" : position === "2nd" ? "2" : "3";
+  const suffix = position === "1st" ? "st" : position === "2nd" ? "nd" : "rd";
+
+  // 1. Explicit placeholder tokens
+  xml = xml.replace(
+    /(<<position>>|&lt;&lt;position&gt;&gt;|<position>|&lt;position&gt;|\{\{position\}\}|\{position\}|\[position\])/gi,
+    `${ordinal} place`
+  );
+  xml = xml.replace(
+    /(<<place>>|&lt;&lt;place&gt;&gt;|<place>|&lt;place&gt;|\{\{place\}\}|\{place\}|\[place\])/gi,
+    `${ordinal} place`
+  );
+  xml = xml.replace(
+    /(<<rank>>|&lt;&lt;rank&gt;&gt;|<rank>|&lt;rank&gt;|\{\{rank\}\}|\{rank\}|\[rank\])/gi,
+    `${ordinal} rank`
+  );
+
+  // 2. Full phrase in a single text run: "3rd place", "2nd place", "1st place", "First Place", etc.
+  xml = xml.replace(/\b(1st|2nd|3rd)\s+(place|prize|rank)\b/gi, `${ordinal} $2`);
+  xml = xml.replace(/\b(first|second|third)\s+(place|prize|rank)\b/gi, (match, p1, p2) => {
+    const isCapital = p1[0] === p1[0].toUpperCase();
+    const repWord = isCapital ? Word : word;
+    return `${repWord} ${p2}`;
+  });
+
+  // 3. Standalone ordinal in single run (e.g. "secured 3rd in the online...", "won 2nd"):
+  // Negative lookahead/lookbehind ensuring it's not a day of the month like 16th, 21st, 23rd, 31st!
+  xml = xml.replace(/(?<!\d)(1st|2nd|3rd)(?!\d)/gi, (m) => {
+    const isUpper = m.toUpperCase() === m;
+    return isUpper ? ordinal.toUpperCase() : ordinal;
+  });
+
+  // 4. Split across runs:
+  // Handles <a:t>3</a:t> + <a:t>rd</a:t>, <a:t>3</a:t> + <a:t>rd place</a:t>, <a:t>has secured 3</a:t> + <a:t>rd</a:t>
+  xml = xml.replace(
+    /(<a:t[^>]*>(?:(?!<\/a:t>)[\s\S])*?(?<!\d))(?:1|2|3)(<\/a:t>(?:(?!<a:t)[\s\S])*?<a:t[^>]*>)(?:st|nd|rd)([\s\S]*?<\/a:t>)/gi,
+    `$1${num}$2${suffix}$3`
+  );
+
+  // 5. Separate number run followed by "place" run:
+  // e.g. <a:t>3</a:t></a:r><a:r><a:t> place</a:t>
+  xml = xml.replace(
+    /(<a:t[^>]*>\s*)(?:1|2|3)(\s*<\/a:t>(?:(?!<a:t)[\s\S])*?<a:t[^>]*>\s*(?:st|nd|rd)?\s*(?:place|prize|rank))/gi,
+    `$1${num}$2`
+  );
+
+  return xml;
+}
+
+/**
+ * Creates a customized PPTX file by replacing <<name>> AND position in slide XMLs
  * Matches the exact Python python-pptx behavior!
  */
 export async function createPptxWithName(
   templatePptxBuffer: ArrayBuffer,
-  replacementName: string
+  replacementName: string,
+  position?: "1st" | "2nd" | "3rd" | "participant"
 ): Promise<ArrayBuffer> {
   const zip = await JSZip.loadAsync(templatePptxBuffer);
   const slideFiles = Object.keys(zip.files).filter(
@@ -123,13 +269,25 @@ export async function createPptxWithName(
     let xml = await zip.file(slidePath)!.async("text");
 
     // Replace standard placeholder tags: <<name>>, &lt;&lt;name&gt;&gt;, <name>, {name}
-    xml = xml.replace(/(<<name>>|&lt;&lt;name&gt;&gt;|<name>|&lt;name&gt;|\{\{name\}\}|\{name\})/gi, replacementName);
+    xml = xml.replace(
+      /(<<name>>|&lt;&lt;name&gt;&gt;|<name>|&lt;name&gt;|\{\{name\}\}|\{name\}|\[name\])/gi,
+      replacementName
+    );
+
+    // Common template placeholder names
+    xml = xml.replace(
+      /\b(Participant\s+Name|Student\s+Name|Candidate\s+Name|Full\s+Name)\b/gi,
+      replacementName
+    );
 
     // If PowerPoint split <<name>> across XML text runs
     const splitRegex = /(&lt;&lt;|<<)(?:(?!&gt;&gt;|>>)(?:[\s\S]))*?name(?:(?!&gt;&gt;|>>)(?:[\s\S]))*?(&gt;&gt;|>>)/gi;
     if (splitRegex.test(xml)) {
       xml = xml.replace(splitRegex, replacementName);
     }
+
+    // Replace placement position (1st, 2nd, 3rd)
+    xml = replacePositionInSlideXml(xml, position);
 
     zip.file(slidePath, xml);
   }
@@ -429,9 +587,10 @@ export function exportBatchCertificatesPdf(
 
 /**
  * Batch exports certificates into two separate ZIP folders (Winners Appreciation vs Participation)
- * Matches Python output_dir structure:
- * - Generates {Formatted_Name}.pdf for each student
- * - Also includes {Formatted_Name}.pptx if a template.pptx was uploaded!
+ * Matches the user's exact Python workflow:
+ * - Replaces <<name>> and position (1st, 2nd, 3rd) in the PowerPoint PPTX
+ * - Uses PowerPoint COM (/api/convert-pptx) to convert the exact PPTX to high-fidelity PDF (SaveAs 32)
+ * - Includes both {Formatted_Name}.pdf and {Formatted_Name}.pptx in the ZIP archive!
  */
 export async function exportCertificatesZip(
   type: "winners" | "participation",
@@ -466,45 +625,121 @@ export async function exportCertificatesZip(
     );
   }
 
-  for (let i = 0; i < targetAttendees.length; i++) {
-    const att = targetAttendees[i];
-    const pos = getWinnerPosition(att, winners);
-    const formattedName = formatCertificateName(att.name);
-    const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
+  // If a PowerPoint template was uploaded, customize PPTX and convert via PowerPoint COM
+  if (templatePptxBuffer) {
+    const pptxItems: {
+      name: string;
+      pptxBuffer: ArrayBuffer;
+      pptxBase64: string;
+      attendee: FeedbackAttendee;
+      position: "1st" | "2nd" | "3rd" | "participant";
+    }[] = [];
 
-    // 1. Generate {name}.pdf
-    const doc = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    });
+    for (const att of targetAttendees) {
+      const pos = getWinnerPosition(att, winners);
+      const formattedName = formatCertificateName(att.name);
+      const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
 
-    renderCertificatePage(
-      doc,
-      {
+      const pptxData = await createPptxWithName(templatePptxBuffer, formattedName, pos);
+      const b64 = arrayBufferToBase64(pptxData);
+
+      pptxItems.push({
+        name: safeName,
+        pptxBuffer: pptxData,
+        pptxBase64: b64,
         attendee: att,
-        eventName,
-        eventDate,
-        venue,
         position: pos,
-        facultyCoordinator,
-        templateImage,
-      },
-      0,
-      1
-    );
+      });
+    }
 
-    const pdfData = doc.output("arraybuffer");
-    zip.file(`${safeName}.pdf`, pdfData);
+    // Call PowerPoint COM API to convert customized PPTX files directly into native PDFs
+    let convertedPdfs: Record<string, string> = {};
+    try {
+      const res = await fetch("/api/convert-pptx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "batch_convert",
+          items: pptxItems.map((item) => ({
+            name: item.name,
+            pptxBase64: item.pptxBase64,
+          })),
+        }),
+      });
 
-    // 2. If a PPTX template was uploaded, generate the modified {name}.pptx
-    if (templatePptxBuffer) {
-      try {
-        const pptxData = await createPptxWithName(templatePptxBuffer, formattedName);
-        zip.file(`${safeName}.pptx`, pptxData);
-      } catch (err) {
-        console.warn(`Could not generate PPTX for ${safeName}`, err);
+      const data = await res.json();
+      if (data.success && data.pdfs) {
+        convertedPdfs = data.pdfs;
+      } else {
+        console.warn("PowerPoint batch conversion returned error:", data.error);
       }
+    } catch (apiErr) {
+      console.warn("Could not reach /api/convert-pptx, falling back to client PDF:", apiErr);
+    }
+
+    // For each item, add the converted native PDF (or fallback to jsPDF)
+    for (const item of pptxItems) {
+      if (convertedPdfs[item.name]) {
+        const pdfBytes = base64ToUint8Array(convertedPdfs[item.name]);
+        zip.file(`${item.name}.pdf`, pdfBytes);
+      } else {
+        // Fallback: jsPDF
+        const doc = new jsPDF({
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4",
+        });
+
+        renderCertificatePage(
+          doc,
+          {
+            attendee: item.attendee,
+            eventName,
+            eventDate,
+            venue,
+            position: item.position,
+            facultyCoordinator,
+            templateImage,
+          },
+          0,
+          1
+        );
+
+        const fallbackPdf = doc.output("arraybuffer");
+        zip.file(`${item.name}.pdf`, fallbackPdf);
+      }
+    }
+  } else {
+    // Default Official CSI SB RSET Vector Certificate (when no custom PPTX is uploaded)
+    for (let i = 0; i < targetAttendees.length; i++) {
+      const att = targetAttendees[i];
+      const pos = getWinnerPosition(att, winners);
+      const formattedName = formatCertificateName(att.name);
+      const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
+
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+
+      renderCertificatePage(
+        doc,
+        {
+          attendee: att,
+          eventName,
+          eventDate,
+          venue,
+          position: pos,
+          facultyCoordinator,
+          templateImage,
+        },
+        0,
+        1
+      );
+
+      const pdfData = doc.output("arraybuffer");
+      zip.file(`${safeName}.pdf`, pdfData);
     }
   }
 
@@ -523,4 +758,217 @@ export async function exportCertificatesZip(
   URL.revokeObjectURL(url);
 
   return targetAttendees.length;
+}
+
+/**
+ * Format date with ordinal day (e.g. "September 17th 2026")
+ */
+export function formatOrdinalDate(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const months = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    const j = day % 10, k = day % 100;
+    let suffix = "th";
+    if (j === 1 && k !== 11) suffix = "st";
+    else if (j === 2 && k !== 12) suffix = "nd";
+    else if (j === 3 && k !== 13) suffix = "rd";
+    return `${month} ${day}${suffix} ${year}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
+ * Generates high-res raster data URL for official CSI RSET Coordinator Appreciation Certificate
+ * using the pre-baked official template image with dynamic coordinator name, event, and date.
+ */
+export async function generateCoordinatorCertificateDataUrl(
+  event: CSIEvent,
+  coordinatorName: string
+): Promise<string> {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return COORDINATOR_TEMPLATE_BASE64;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 725;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return COORDINATOR_TEMPLATE_BASE64;
+
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("Failed to load template image"));
+    img.src = COORDINATOR_TEMPLATE_BASE64;
+  });
+
+  // 1. Draw base clean template
+  ctx.drawImage(img, 0, 0, 1024, 725);
+
+  const formattedName = formatCertificateName(coordinatorName);
+  const formattedDate = formatOrdinalDate(event.event_date);
+
+  // 2. Render Coordinator Name in gold script font
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = 'italic 52px "Brush Script MT", "Great Vibes", "Playfair Display", "Georgia", "Times New Roman", cursive';
+  ctx.fillStyle = "#C99B3B";
+  ctx.shadowColor = "rgba(180, 130, 40, 0.25)";
+  ctx.shadowBlur = 4;
+  ctx.fillText(formattedName, 512, 368);
+  ctx.restore();
+
+  // 3. Render Gold Divider line with center diamond accent
+  ctx.save();
+  ctx.strokeStyle = "#E2B857";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(300, 408);
+  ctx.lineTo(502, 408);
+  ctx.moveTo(522, 408);
+  ctx.lineTo(724, 408);
+  ctx.stroke();
+
+  // Center diamond accent
+  ctx.fillStyle = "#E2B857";
+  ctx.beginPath();
+  ctx.moveTo(512, 403);
+  ctx.lineTo(517, 408);
+  ctx.lineTo(512, 413);
+  ctx.lineTo(507, 408);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // 4. Render Writeup Text (Serif font matching original certificate)
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#111827";
+
+  const renderMultiFontLine = (
+    y: number,
+    segments: Array<{ text: string; bold: boolean }>
+  ) => {
+    let totalWidth = 0;
+    const measured: Array<{ text: string; bold: boolean; width: number }> = [];
+    for (const seg of segments) {
+      ctx.font = seg.bold
+        ? '700 17.5px "Times New Roman", Times, serif'
+        : '400 17.5px "Times New Roman", Times, serif';
+      const w = ctx.measureText(seg.text).width;
+      measured.push({ ...seg, width: w });
+      totalWidth += w;
+    }
+
+    let startX = 512 - totalWidth / 2;
+    for (const m of measured) {
+      ctx.font = m.bold
+        ? '700 17.5px "Times New Roman", Times, serif'
+        : '400 17.5px "Times New Roman", Times, serif';
+      ctx.fillText(m.text, startX + m.width / 2, y);
+      startX += m.width;
+    }
+  };
+
+  // Line 1: In appreciation for their esteemed support as the Coordinator of [Event Name],
+  renderMultiFontLine(446, [
+    { text: "In appreciation for their esteemed support as the Coordinator of ", bold: false },
+    { text: event.event_name, bold: true },
+    { text: ",", bold: false },
+  ]);
+
+  // Line 2: by Computer Society of India (CSI) SB RSET on [Date],
+  renderMultiFontLine(474, [
+    { text: "by ", bold: false },
+    { text: "Computer Society of India (CSI) SB RSET", bold: true },
+    { text: " on ", bold: false },
+    { text: formattedDate, bold: false },
+    { text: ",", bold: false },
+  ]);
+
+  // Line 3: at Rajagiri School of Engineering & Technology, Kakkanad.
+  renderMultiFontLine(502, [
+    { text: "at Rajagiri School of Engineering & Technology, Kakkanad.", bold: false },
+  ]);
+
+  ctx.restore();
+
+  return canvas.toDataURL("image/png");
+}
+
+/**
+ * Render Coordinator Certificate onto a jsPDF instance
+ */
+export async function renderCoordinatorCertificate(
+  doc: jsPDF,
+  event: CSIEvent,
+  coordinatorName: string
+) {
+  const dataUrl = await generateCoordinatorCertificateDataUrl(event, coordinatorName);
+  doc.addImage(dataUrl, "PNG", 0, 0, 297, 210);
+}
+
+/**
+ * Export single Coordinator Certificate as PDF
+ */
+export async function exportCoordinatorCertificatePdf(
+  event: CSIEvent,
+  coordinatorName: string
+) {
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4",
+  });
+  await renderCoordinatorCertificate(doc, event, coordinatorName);
+  const formattedName = formatCertificateName(coordinatorName);
+  const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim() || "Coordinator";
+  doc.save(`${safeName} - Coordinator Certificate.pdf`);
+}
+
+/**
+ * Batch export all Coordinator Certificates as a single ZIP with only .pdf files
+ */
+export async function exportCoordinatorCertificatesZip(
+  event: CSIEvent,
+  coordinatorNames: string[]
+): Promise<number> {
+  const zip = new JSZip();
+
+  for (const name of coordinatorNames) {
+    if (!name.trim()) continue;
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+    await renderCoordinatorCertificate(doc, event, name);
+    const pdfData = doc.output("arraybuffer");
+    const formattedName = formatCertificateName(name);
+    const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim() || "Coordinator";
+    zip.file(`${safeName} - Coordinator Certificate.pdf`, pdfData);
+  }
+
+  const blob = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const cleanEvent = event.event_name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  a.download = `Coordinator_Certificates_${cleanEvent}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  return coordinatorNames.length;
 }

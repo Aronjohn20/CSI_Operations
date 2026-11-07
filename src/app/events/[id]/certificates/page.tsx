@@ -16,6 +16,11 @@ import {
   RotateCcw,
   X,
   FileCode,
+  FileSpreadsheet,
+  FileText,
+  Link2,
+  Clipboard,
+  ShieldCheck,
 } from "lucide-react";
 import { CSIEvent, FeedbackAttendee } from "@/lib/types";
 import { getEventById, updateEvent } from "@/lib/eventsStorage";
@@ -24,10 +29,15 @@ import {
   getWinnerPosition,
   formatCertificateName,
   extractPptxData,
+  createPptxWithName,
+  arrayBufferToBase64,
+  base64ToUint8Array,
 } from "@/lib/certificateExport";
 import {
   mapGoogleSheetToFeedbackAttendees,
   generateMockFeedbackResponses,
+  parseCsvText,
+  parseXlsxBuffer,
 } from "@/lib/feedbackFormGenerator";
 
 export default function CertificateStudioPage() {
@@ -67,6 +77,15 @@ export default function CertificateStudioPage() {
   // Live Preview Controls
   const [previewTab, setPreviewTab] = useState<"appreciation" | "participation">("appreciation");
   const [selectedPreviewUid, setSelectedPreviewUid] = useState<string>("");
+  const [liveSlidePreview, setLiveSlidePreview] = useState<string>("");
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  // Import Responses Modal State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importMethod, setImportMethod] = useState<"file" | "sheet" | "paste">("file");
+  const [importSheetUrl, setImportSheetUrl] = useState("");
+  const [importPastedText, setImportPastedText] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
 
   // Export Loading States
   const [isExportingWinnersZip, setIsExportingWinnersZip] = useState(false);
@@ -92,6 +111,24 @@ export default function CertificateStudioPage() {
       if (found.certificate_templates) {
         setAppreciationTemplate(found.certificate_templates.appreciation_template_data || "");
         setParticipationTemplate(found.certificate_templates.participation_template_data || "");
+      }
+
+      // Restore session PPTX templates if available
+      try {
+        const apprB64 = sessionStorage.getItem(`csi_appr_pptx_${eventId}`);
+        const apprName = sessionStorage.getItem(`csi_appr_pptx_name_${eventId}`) || "appreciation.pptx";
+        if (apprB64) {
+          const u8 = base64ToUint8Array(apprB64);
+          setAppreciationPptxFile({ buffer: u8.buffer as ArrayBuffer, name: apprName });
+        }
+        const partB64 = sessionStorage.getItem(`csi_part_pptx_${eventId}`);
+        const partName = sessionStorage.getItem(`csi_part_pptx_name_${eventId}`) || "participation.pptx";
+        if (partB64) {
+          const u8 = base64ToUint8Array(partB64);
+          setParticipationPptxFile({ buffer: u8.buffer as ArrayBuffer, name: partName });
+        }
+      } catch (err) {
+        console.warn("Could not restore PPTX from session storage:", err);
       }
 
       if (existingAttendees.length > 0) {
@@ -233,6 +270,10 @@ export default function CertificateStudioPage() {
 
         if (type === "appreciation") {
           setAppreciationPptxFile({ buffer: pptxBuffer, name: fileName });
+          try {
+            sessionStorage.setItem(`csi_appr_pptx_${eventId}`, arrayBufferToBase64(pptxBuffer));
+            sessionStorage.setItem(`csi_appr_pptx_name_${eventId}`, fileName);
+          } catch {}
           if (previewImageBase64) {
             setAppreciationTemplate(previewImageBase64);
             saveEventChanges(
@@ -245,6 +286,10 @@ export default function CertificateStudioPage() {
           }
         } else {
           setParticipationPptxFile({ buffer: pptxBuffer, name: fileName });
+          try {
+            sessionStorage.setItem(`csi_part_pptx_${eventId}`, arrayBufferToBase64(pptxBuffer));
+            sessionStorage.setItem(`csi_part_pptx_name_${eventId}`, fileName);
+          } catch {}
           if (previewImageBase64) {
             setParticipationTemplate(previewImageBase64);
             saveEventChanges(
@@ -259,7 +304,7 @@ export default function CertificateStudioPage() {
 
         setStatusNotice({
           type: "success",
-          text: `PowerPoint template "${fileName}" loaded successfully! Dynamic <<name>> replacement ready.`,
+          text: `PowerPoint template "${fileName}" loaded! Dynamic names & positions will convert to native PDFs via PowerPoint COM.`,
         });
       } catch (err: any) {
         setStatusNotice({
@@ -346,6 +391,213 @@ export default function CertificateStudioPage() {
     );
     return found || attendees[0];
   }, [attendees, selectedPreviewUid]);
+
+  // Generate real PowerPoint slide preview when attendee or tab changes
+  useEffect(() => {
+    const activePptx = previewTab === "appreciation" ? appreciationPptxFile : participationPptxFile;
+    if (!activePptx?.buffer || !currentPreviewAttendee) {
+      setLiveSlidePreview("");
+      return;
+    }
+
+    let isCancelled = false;
+    const generatePreview = async () => {
+      setIsPreviewLoading(true);
+      try {
+        const pos = getWinnerPosition(currentPreviewAttendee, winnersObject);
+        const formattedName = formatCertificateName(currentPreviewAttendee.name);
+        const customizedPptx = await createPptxWithName(activePptx.buffer, formattedName, pos);
+        const b64 = arrayBufferToBase64(customizedPptx);
+
+        const res = await fetch("/api/convert-pptx", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "preview",
+            pptxBase64: b64,
+          }),
+        });
+
+        const data = await res.json();
+        if (!isCancelled && data.success && data.previewImage) {
+          setLiveSlidePreview(data.previewImage);
+        }
+      } catch (err) {
+        console.warn("Could not generate live slide preview:", err);
+      } finally {
+        if (!isCancelled) setIsPreviewLoading(false);
+      }
+    };
+
+    const timeout = setTimeout(generatePreview, 200);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [
+    currentPreviewAttendee?.uid,
+    currentPreviewAttendee?.name,
+    previewTab,
+    appreciationPptxFile,
+    participationPptxFile,
+    firstPlaceWinners,
+    secondPlaceWinners,
+    thirdPlaceWinners,
+    winnersObject,
+  ]);
+
+  // Handle Import File (.xlsx, .xls, .csv, .tsv)
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setStatusNotice(null);
+
+    try {
+      const fileName = file.name.toLowerCase();
+      let headers: string[] = [];
+      let rows: string[][] = [];
+
+      if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+        const parsed = await parseXlsxBuffer(await file.arrayBuffer());
+        headers = parsed.headers;
+        rows = parsed.rows;
+      } else {
+        const text = await file.text();
+        const parsed = parseCsvText(text);
+        headers = parsed.headers;
+        rows = parsed.rows;
+      }
+
+      const mapped = mapGoogleSheetToFeedbackAttendees(headers, rows);
+      if (mapped.length === 0) {
+        throw new Error("No participant entries found in the uploaded file.");
+      }
+
+      setAttendees(mapped);
+      saveEventChanges(
+        firstPlaceWinners,
+        secondPlaceWinners,
+        thirdPlaceWinners,
+        appreciationTemplate,
+        participationTemplate,
+        mapped
+      );
+
+      setStatusNotice({
+        type: "success",
+        text: `Successfully imported ${mapped.length} verified participant(s) from "${file.name}"!`,
+      });
+      if (mapped.length > 0) {
+        setSelectedPreviewUid(mapped[0].uid || mapped[0].name);
+      }
+      setIsImportModalOpen(false);
+    } catch (err: any) {
+      alert("Import failed: " + (err.message || "Invalid file format"));
+    } finally {
+      setIsImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  // Handle Import from Google Sheet URL / ID
+  const handleImportGoogleSheetUrl = async () => {
+    if (!importSheetUrl.trim()) {
+      alert("Please enter a Google Sheet URL or Sheet ID.");
+      return;
+    }
+
+    setIsImporting(true);
+    setStatusNotice(null);
+
+    try {
+      let sheetId = importSheetUrl.trim();
+      const match = importSheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (match) sheetId = match[1];
+
+      const res = await fetch("/api/google-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_feedback_responses",
+          sheetId: sheetId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch responses from Google Sheet.");
+      }
+
+      const mapped = mapGoogleSheetToFeedbackAttendees(data.headers || [], data.rows || []);
+      if (mapped.length === 0) {
+        throw new Error("The Google Sheet has no attendee responses yet.");
+      }
+
+      setAttendees(mapped);
+      saveEventChanges(
+        firstPlaceWinners,
+        secondPlaceWinners,
+        thirdPlaceWinners,
+        appreciationTemplate,
+        participationTemplate,
+        mapped
+      );
+
+      setStatusNotice({
+        type: "success",
+        text: `Successfully connected & imported ${mapped.length} participant(s) from Google Sheet!`,
+      });
+      if (mapped.length > 0) {
+        setSelectedPreviewUid(mapped[0].uid || mapped[0].name);
+      }
+      setIsImportModalOpen(false);
+      setImportSheetUrl("");
+    } catch (err: any) {
+      alert("Google Sheet Import failed: " + (err.message || "Could not fetch responses"));
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Handle Import from Pasted Text
+  const handleImportPastedData = () => {
+    if (!importPastedText.trim()) {
+      alert("Please paste table or CSV data first.");
+      return;
+    }
+
+    try {
+      const parsed = parseCsvText(importPastedText);
+      const mapped = mapGoogleSheetToFeedbackAttendees(parsed.headers, parsed.rows);
+      if (mapped.length === 0) {
+        throw new Error("No participant entries found in the pasted data.");
+      }
+
+      setAttendees(mapped);
+      saveEventChanges(
+        firstPlaceWinners,
+        secondPlaceWinners,
+        thirdPlaceWinners,
+        appreciationTemplate,
+        participationTemplate,
+        mapped
+      );
+
+      setStatusNotice({
+        type: "success",
+        text: `Successfully imported ${mapped.length} participant(s) from pasted data!`,
+      });
+      if (mapped.length > 0) {
+        setSelectedPreviewUid(mapped[0].uid || mapped[0].name);
+      }
+      setIsImportModalOpen(false);
+      setImportPastedText("");
+    } catch (err: any) {
+      alert("Import failed: " + (err.message || "Invalid data format"));
+    }
+  };
 
   // Export 1: Winners Appreciation ZIP
   const handleDownloadWinnersZip = async () => {
@@ -458,8 +710,26 @@ export default function CertificateStudioPage() {
           </div>
         </div>
 
-        {/* Sync Controls */}
+        {/* Sync & Import Controls */}
         <div className="flex items-center gap-2.5 flex-wrap">
+          <Link
+            href={`/events/${event.id}`}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white text-[15px] font-bold flex items-center gap-2 transition shadow-lg shadow-blue-900/30 border border-blue-400/40"
+            title="Coordinator Certificates (Admin Easter Egg)"
+          >
+            <ShieldCheck className="w-4 h-4 text-blue-200" />
+            <span>Coordinator Studio</span>
+          </Link>
+
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white text-[15px] font-bold flex items-center gap-2 transition shadow-lg shadow-purple-900/30 border border-purple-400/40"
+            title="Import responses from Excel (.xlsx), CSV, or Google Sheet"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-purple-200" />
+            <span>Import Responses</span>
+          </button>
+
           <button
             onClick={handleSyncFromDriveSheet}
             disabled={isSyncing}
@@ -512,11 +782,19 @@ export default function CertificateStudioPage() {
           className="p-5 rounded-2xl bg-gradient-to-r from-amber-600 via-amber-700 to-orange-700 hover:from-amber-500 hover:to-orange-600 text-white font-extrabold flex items-center justify-between transition shadow-xl shadow-amber-900/30 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <div className="flex items-center gap-3">
-            <Trophy className="w-6 h-6 text-amber-200" />
+            {isExportingWinnersZip ? (
+              <RefreshCw className="w-6 h-6 text-amber-200 animate-spin" />
+            ) : (
+              <Trophy className="w-6 h-6 text-amber-200" />
+            )}
             <div className="text-left">
-              <div className="text-lg font-extrabold">Download Winners Folder</div>
+              <div className="text-lg font-extrabold">
+                {isExportingWinnersZip ? "Converting PPTX to PDF..." : "Download Winners Folder"}
+              </div>
               <div className="text-xs text-amber-100 font-normal">
-                {totalWinnersCount} Winner(s) (1st, 2nd, 3rd Place)
+                {isExportingWinnersZip
+                  ? "PowerPoint COM rendering native PDFs..."
+                  : `${totalWinnersCount} Winner(s) (1st, 2nd, 3rd Place)`}
               </div>
             </div>
           </div>
@@ -530,11 +808,19 @@ export default function CertificateStudioPage() {
           className="p-5 rounded-2xl bg-gradient-to-r from-cyan-600 via-teal-600 to-cyan-700 hover:from-cyan-500 hover:to-teal-500 text-white font-extrabold flex items-center justify-between transition shadow-xl shadow-cyan-900/30 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <div className="flex items-center gap-3">
-            <Award className="w-6 h-6 text-cyan-200" />
+            {isExportingParticipationZip ? (
+              <RefreshCw className="w-6 h-6 text-cyan-200 animate-spin" />
+            ) : (
+              <Award className="w-6 h-6 text-cyan-200" />
+            )}
             <div className="text-left">
-              <div className="text-lg font-extrabold">Download Participation Folder</div>
+              <div className="text-lg font-extrabold">
+                {isExportingParticipationZip ? "Converting PPTX to PDF..." : "Download Participation Folder"}
+              </div>
               <div className="text-xs text-cyan-100 font-normal">
-                {totalParticipantsCount} Participant(s)
+                {isExportingParticipationZip
+                  ? "PowerPoint COM rendering native PDFs..."
+                  : `${totalParticipantsCount} Participant(s)`}
               </div>
             </div>
           </div>
@@ -789,38 +1075,40 @@ export default function CertificateStudioPage() {
         </div>
 
         {/* Visual Certificate Canvas */}
-        <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl border border-purple-500/30 flex items-center justify-center overflow-x-auto shadow-inner">
-          <div
-            className="w-[850px] h-[600px] shrink-0 bg-white text-black rounded-lg shadow-2xl relative flex flex-col justify-center items-center overflow-hidden"
-            style={{
-              fontFamily: "'Times New Roman', Times, serif",
-              backgroundImage:
-                previewTab === "appreciation"
-                  ? appreciationTemplate
-                    ? `url(${appreciationTemplate})`
-                    : undefined
-                  : participationTemplate
-                  ? `url(${participationTemplate})`
-                  : undefined,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }}
-          >
-            {/* If a custom template is loaded, ONLY stamp the formatted name exactly like the Python PPT script */}
-            {(previewTab === "appreciation" ? appreciationTemplate : participationTemplate) ? (
-              <div className="relative z-10 text-center w-full px-12 mt-12">
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-wide uppercase drop-shadow-sm">
-                  {currentPreviewAttendee
-                    ? formatCertificateName(currentPreviewAttendee.name)
-                    : "PARTICIPANT NAME"}
-                </h1>
+        <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl border border-purple-500/30 flex items-center justify-center overflow-x-auto shadow-inner relative min-h-[350px]">
+          {isPreviewLoading && (
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/85 border border-purple-500/40 text-purple-200 text-xs font-semibold backdrop-blur-md shadow-lg animate-pulse">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-400" />
+              <span>Rendering Preview...</span>
+            </div>
+          )}
+
+          {/* 1. Real PowerPoint slide preview image with exact student name and placement */}
+          {liveSlidePreview ? (
+            <div className="w-[850px] max-w-full rounded-xl overflow-hidden shadow-2xl border border-purple-500/30 bg-black flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={liveSlidePreview}
+                alt="Certificate Live Preview"
+                className="w-full h-auto object-contain rounded-lg"
+              />
+            </div>
+          ) : (previewTab === "appreciation" ? appreciationTemplate : participationTemplate) ? (
+            /* 2. Fallback if preview is loading or template image is uploaded */
+            <div className="w-[850px] max-w-full rounded-xl overflow-hidden shadow-2xl border border-purple-500/30 bg-black flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewTab === "appreciation" ? appreciationTemplate : participationTemplate}
+                alt="Certificate Template Preview"
+                className="w-full h-auto object-contain rounded-lg"
+              />
+            </div>
+          ) : (
+            // Default template layout when no custom image or PPTX is uploaded
+            <div className="w-[850px] h-[600px] shrink-0 bg-white text-black rounded-lg shadow-2xl relative flex flex-col justify-between overflow-hidden p-8" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
+              <div className="absolute inset-3 border-[3px] border-[#18122B] pointer-events-none">
+                <div className="absolute inset-1.5 border border-[#D97706]" />
               </div>
-            ) : (
-              // Default template layout when no custom image or PPTX is uploaded
-              <div className="w-full h-full p-8 flex flex-col justify-between relative">
-                <div className="absolute inset-3 border-[3px] border-[#18122B] pointer-events-none">
-                  <div className="absolute inset-1.5 border border-[#D97706]" />
-                </div>
 
                 {/* Default Header */}
                 <div className="relative z-10 flex items-center justify-between pt-2 px-3">
@@ -896,7 +1184,143 @@ export default function CertificateStudioPage() {
             )}
           </div>
         </div>
-      </div>
+
+      {/* IMPORT RESPONSES MODAL */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#12101C] border border-purple-500/40 w-full max-w-lg rounded-2xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-purple-500/30 pb-3">
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-5 h-5 text-purple-400" />
+                <h3 className="text-lg font-bold text-white">Import Feedback Responses</h3>
+              </div>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Import Method Tabs */}
+            <div className="grid grid-cols-3 gap-2 bg-black p-1 rounded-xl border border-purple-500/30 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setImportMethod("file")}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                  importMethod === "file"
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload File</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportMethod("sheet")}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                  importMethod === "sheet"
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Google Sheet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportMethod("paste")}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                  importMethod === "paste"
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Clipboard className="w-3.5 h-3.5" />
+                <span>Paste Table</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Upload File (.xlsx, .xls, .csv, .tsv) */}
+            {importMethod === "file" && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300">
+                  Upload an Excel spreadsheet or CSV file with respondent names:
+                </p>
+                <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-purple-500/40 hover:border-purple-400 rounded-xl bg-black/40 cursor-pointer transition text-center space-y-2">
+                  <FileSpreadsheet className="w-8 h-8 text-purple-400" />
+                  <span className="text-sm font-bold text-white">Click to choose Excel or CSV file</span>
+                  <span className="text-xs text-slate-400">Supports .xlsx, .xls, .csv, .tsv</span>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv, .tsv, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="hidden"
+                    onChange={handleImportFile}
+                    disabled={isImporting}
+                  />
+                </label>
+                {isImporting && (
+                  <div className="flex items-center justify-center gap-2 text-xs text-purple-300 pt-2 font-semibold">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Parsing spreadsheet responses...</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab 2: Google Sheet URL */}
+            {importMethod === "sheet" && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300">
+                  Paste the public or shared Google Sheet URL of the feedback responses:
+                </p>
+                <input
+                  type="text"
+                  value={importSheetUrl}
+                  onChange={(e) => setImportSheetUrl(e.target.value)}
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-black border border-purple-500/40 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleImportGoogleSheetUrl}
+                  disabled={isImporting || !importSheetUrl.trim()}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isImporting ? "animate-spin" : ""}`} />
+                  <span>{isImporting ? "Connecting Sheet..." : "Connect & Fetch Responses"}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Tab 3: Paste Table Data */}
+            {importMethod === "paste" && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300">
+                  Copy cells from Excel or Google Sheets (Ctrl+C) and paste below (Ctrl+V):
+                </p>
+                <textarea
+                  rows={6}
+                  value={importPastedText}
+                  onChange={(e) => setImportPastedText(e.target.value)}
+                  placeholder={`Name\tUID\tDepartment\nAbhishek K Menon\tU220101\tCSE\nDevanarayanan S\tU220102\tCSE`}
+                  className="w-full p-3 rounded-xl bg-black border border-purple-500/40 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-400 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleImportPastedData}
+                  disabled={!importPastedText.trim()}
+                  className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"
+                >
+                  <Clipboard className="w-3.5 h-3.5" />
+                  <span>Parse &amp; Import Participants</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
