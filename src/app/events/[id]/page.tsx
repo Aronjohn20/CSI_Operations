@@ -37,6 +37,8 @@ import {
   HelpCircle,
   ChevronDown,
   X,
+  Upload,
+  RotateCcw,
 } from "lucide-react";
 import QRCode from "qrcode";
 import {
@@ -66,6 +68,11 @@ import {
   exportCoordinatorCertificatePdf,
   exportCoordinatorCertificatesZip,
   generateCoordinatorCertificateDataUrl,
+  extractPptxData,
+  arrayBufferToBase64,
+  base64ToUint8Array,
+  convertPdfToImageDataUrl,
+  createCoordinatorPptx,
 } from "@/lib/certificateExport";
 import {
   exportRsmsPdf,
@@ -94,6 +101,10 @@ export default function EventContainerPage() {
   const [selectedCoordinator, setSelectedCoordinator] = useState<string>("");
   const [coordinatorPreviewUrl, setCoordinatorPreviewUrl] = useState<string | null>(null);
   const [isGeneratingCoordinatorCerts, setIsGeneratingCoordinatorCerts] = useState(false);
+  const [coordinatorCustomTemplate, setCoordinatorCustomTemplate] = useState<string>("");
+  const [coordinatorTemplateFileName, setCoordinatorTemplateFileName] = useState<string>("");
+  const [coordinatorPptxFile, setCoordinatorPptxFile] = useState<{ buffer: ArrayBuffer; name: string } | null>(null);
+  const [isUploadingCoordinatorTemplate, setIsUploadingCoordinatorTemplate] = useState(false);
 
   const handleDeleteEvent = () => {
     if (!event) return;
@@ -763,14 +774,64 @@ export default function EventContainerPage() {
   }, [eventId]);
 
   useEffect(() => {
+    if (!eventId) return;
+    try {
+      const savedImg = sessionStorage.getItem(`csi_coord_template_${eventId}`);
+      const savedName = sessionStorage.getItem(`csi_coord_template_name_${eventId}`);
+      const savedPptxB64 = sessionStorage.getItem(`csi_coord_pptx_${eventId}`);
+      if (savedImg) setCoordinatorCustomTemplate(savedImg);
+      if (savedName) setCoordinatorTemplateFileName(savedName);
+      if (savedPptxB64) {
+        const bytes = base64ToUint8Array(savedPptxB64);
+        setCoordinatorPptxFile({ buffer: bytes.buffer as ArrayBuffer, name: savedName || "template.pptx" });
+      }
+    } catch {}
+  }, [eventId]);
+
+  useEffect(() => {
     if (isUnlocked && event && (selectedCoordinator || (event.assigned_coordinators && event.assigned_coordinators[0]))) {
       const target = selectedCoordinator || event.assigned_coordinators[0];
       if (!selectedCoordinator) setSelectedCoordinator(target);
-      generateCoordinatorCertificateDataUrl(event, target).then((url) => {
-        setCoordinatorPreviewUrl(url);
-      });
+
+      if (coordinatorPptxFile?.buffer) {
+        let isCancelled = false;
+        createCoordinatorPptx(
+          coordinatorPptxFile.buffer,
+          target,
+          event.event_name,
+          event.event_date
+        )
+          .then((customizedPptx) => {
+            const b64 = arrayBufferToBase64(customizedPptx);
+            return fetch("/api/convert-pptx", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "preview", pptxBase64: b64 }),
+            });
+          })
+          .then((r) => r.json())
+          .then((data) => {
+            if (!isCancelled && data.success && data.previewImage) {
+              setCoordinatorPreviewUrl(data.previewImage);
+            }
+          })
+          .catch((err) => {
+            console.warn("PPTX coordinator preview failed:", err);
+          });
+        return () => {
+          isCancelled = true;
+        };
+      } else {
+        generateCoordinatorCertificateDataUrl(
+          event,
+          target,
+          coordinatorCustomTemplate || undefined
+        ).then((url) => {
+          setCoordinatorPreviewUrl(url);
+        });
+      }
     }
-  }, [isUnlocked, selectedCoordinator, event]);
+  }, [isUnlocked, selectedCoordinator, event, coordinatorCustomTemplate, coordinatorPptxFile]);
 
   if (!event) {
     return (
@@ -841,7 +902,12 @@ export default function EventContainerPage() {
     if (!event) return;
     setIsGeneratingCoordinatorCerts(true);
     try {
-      await exportCoordinatorCertificatePdf(event, name);
+      await exportCoordinatorCertificatePdf(
+        event,
+        name,
+        coordinatorCustomTemplate || undefined,
+        coordinatorPptxFile?.buffer
+      );
     } catch (err) {
       console.error(err);
       alert("Failed to export coordinator certificate.");
@@ -854,12 +920,127 @@ export default function EventContainerPage() {
     if (!event || !event.assigned_coordinators.length) return;
     setIsGeneratingCoordinatorCerts(true);
     try {
-      await exportCoordinatorCertificatesZip(event, event.assigned_coordinators);
+      await exportCoordinatorCertificatesZip(
+        event,
+        event.assigned_coordinators,
+        coordinatorCustomTemplate || undefined,
+        coordinatorPptxFile?.buffer
+      );
     } catch (err) {
       console.error(err);
       alert("Failed to batch export coordinator certificates.");
     } finally {
       setIsGeneratingCoordinatorCerts(false);
+    }
+  };
+
+  const handleCoordinatorTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !eventId) return;
+
+    setIsUploadingCoordinatorTemplate(true);
+    try {
+      const lowerName = file.name.toLowerCase();
+      if (lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt")) {
+        const buffer = await file.arrayBuffer();
+        setCoordinatorPptxFile({ buffer, name: file.name });
+        setCoordinatorTemplateFileName(file.name);
+        setCoordinatorCustomTemplate("");
+
+        try {
+          const b64 = arrayBufferToBase64(buffer);
+          sessionStorage.setItem(`csi_coord_pptx_${eventId}`, b64);
+          sessionStorage.setItem(`csi_coord_template_name_${eventId}`, file.name);
+          sessionStorage.removeItem(`csi_coord_template_${eventId}`);
+        } catch (storageErr) {
+          console.warn("Could not save PPTX template to sessionStorage:", storageErr);
+        }
+
+        const target = selectedCoordinator || (event?.assigned_coordinators && event.assigned_coordinators[0]) || "Coordinator";
+        if (event) {
+          const customizedPptx = await createCoordinatorPptx(buffer, target, event.event_name, event.event_date);
+          const b64Cust = arrayBufferToBase64(customizedPptx);
+          const res = await fetch("/api/convert-pptx", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "preview", pptxBase64: b64Cust }),
+          });
+          const data = await res.json();
+          if (data.success && data.previewImage) {
+            setCoordinatorPreviewUrl(data.previewImage);
+          }
+        }
+      } else if (lowerName.endsWith(".pdf")) {
+        const buffer = await file.arrayBuffer();
+        const dataUrl = await convertPdfToImageDataUrl(buffer);
+        setCoordinatorCustomTemplate(dataUrl);
+        setCoordinatorTemplateFileName(file.name);
+        setCoordinatorPptxFile(null);
+
+        try {
+          sessionStorage.setItem(`csi_coord_template_${eventId}`, dataUrl);
+          sessionStorage.setItem(`csi_coord_template_name_${eventId}`, file.name);
+          sessionStorage.removeItem(`csi_coord_pptx_${eventId}`);
+        } catch (storageErr) {
+          console.warn("Could not save PDF image template to sessionStorage:", storageErr);
+        }
+
+        const target = selectedCoordinator || (event?.assigned_coordinators && event.assigned_coordinators[0]) || "Coordinator";
+        if (event) {
+          const previewUrl = await generateCoordinatorCertificateDataUrl(event, target, dataUrl);
+          setCoordinatorPreviewUrl(previewUrl);
+        }
+      } else {
+        const reader = new FileReader();
+        reader.onload = async (eventReader) => {
+          const dataUrl = eventReader.target?.result as string;
+          if (dataUrl) {
+            setCoordinatorCustomTemplate(dataUrl);
+            setCoordinatorTemplateFileName(file.name);
+            setCoordinatorPptxFile(null);
+
+            try {
+              sessionStorage.setItem(`csi_coord_template_${eventId}`, dataUrl);
+              sessionStorage.setItem(`csi_coord_template_name_${eventId}`, file.name);
+              sessionStorage.removeItem(`csi_coord_pptx_${eventId}`);
+            } catch (storageErr) {
+              console.warn("Could not save image template to sessionStorage:", storageErr);
+            }
+
+            const target = selectedCoordinator || (event?.assigned_coordinators && event.assigned_coordinators[0]) || "Coordinator";
+            if (event) {
+              const previewUrl = await generateCoordinatorCertificateDataUrl(event, target, dataUrl);
+              setCoordinatorPreviewUrl(previewUrl);
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.error("Failed to load coordinator certificate template:", err);
+      alert("Failed to load template file. Please try another PPTX, PDF, or image file.");
+    } finally {
+      setIsUploadingCoordinatorTemplate(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleResetCoordinatorTemplate = () => {
+    setCoordinatorCustomTemplate("");
+    setCoordinatorTemplateFileName("");
+    setCoordinatorPptxFile(null);
+    if (eventId) {
+      try {
+        sessionStorage.removeItem(`csi_coord_template_${eventId}`);
+        sessionStorage.removeItem(`csi_coord_template_name_${eventId}`);
+        sessionStorage.removeItem(`csi_coord_pptx_${eventId}`);
+      } catch {}
+    }
+    const target = selectedCoordinator || (event?.assigned_coordinators && event.assigned_coordinators[0]) || "Coordinator";
+    if (event) {
+      generateCoordinatorCertificateDataUrl(event, target).then((url) => {
+        setCoordinatorPreviewUrl(url);
+      });
     }
   };
 
@@ -2468,7 +2649,12 @@ export default function EventContainerPage() {
                   <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                      <span>Identity verified! Official CSI SB RSET Coordinator template loaded.</span>
+                      <span>
+                        Identity verified!{" "}
+                        {coordinatorTemplateFileName
+                          ? `Custom template "${coordinatorTemplateFileName}" loaded.`
+                          : "Official CSI SB RSET Coordinator template loaded."}
+                      </span>
                     </div>
                     <button
                       onClick={handleDownloadAllCoordinators}
@@ -2482,6 +2668,58 @@ export default function EventContainerPage() {
                       )}
                       <span>Download All Coordinators ZIP</span>
                     </button>
+                  </div>
+
+                  {/* Template Upload & Customization Bar */}
+                  <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                          Active Template:
+                        </span>
+                        {coordinatorTemplateFileName ? (
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            Custom: {coordinatorTemplateFileName}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            Official CSI SB RSET Gold Standard
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        Upload custom certificate template as <span className="text-purple-300 font-semibold">PowerPoint (.pptx)</span>, <span className="text-purple-300 font-semibold">PDF (.pdf)</span>, or <span className="text-purple-300 font-semibold">Image</span>.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <label className="cursor-pointer px-3.5 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-md shadow-purple-600/30">
+                        {isUploadingCoordinatorTemplate ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        <span>{coordinatorTemplateFileName ? "Change Template" : "Upload Template (PPTX / PDF)"}</span>
+                        <input
+                          type="file"
+                          accept=".pptx,.ppt,.pdf,image/png,image/jpeg,image/jpg"
+                          onChange={handleCoordinatorTemplateUpload}
+                          className="hidden"
+                          disabled={isUploadingCoordinatorTemplate}
+                        />
+                      </label>
+
+                      {coordinatorTemplateFileName && (
+                        <button
+                          onClick={handleResetCoordinatorTemplate}
+                          title="Reset to default official template"
+                          className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 border border-slate-600"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reset Default</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Coordinator selector pills */}

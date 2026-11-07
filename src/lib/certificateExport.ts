@@ -761,6 +761,96 @@ export async function exportCertificatesZip(
 }
 
 /**
+ * Converts a PDF ArrayBuffer to an image Data URL in the browser using PDF.js
+ */
+export async function convertPdfToImageDataUrl(pdfBuffer: ArrayBuffer): Promise<string> {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return "";
+  }
+
+  // Inject pdf.js from cdnjs if not already present on window
+  if (!(window as any).pdfjsLib) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      script.onload = () => {
+        try {
+          (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        } catch {}
+        resolve();
+      };
+      script.onerror = () => reject(new Error("Failed to load PDF.js engine"));
+      document.head.appendChild(script);
+    });
+  }
+
+  const pdfjsLib = (window as any).pdfjsLib;
+  const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+  const pdf = await loadingTask.promise;
+  const page = await pdf.getPage(1);
+
+  // Render at 2.0x scale for crisp certificate print quality
+  const viewport = page.getViewport({ scale: 2.0 });
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not initialize 2D canvas");
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas.toDataURL("image/png");
+}
+
+/**
+ * Creates a customized Coordinator PPTX file by replacing <<name>>, <<event>>, and <<date>> tags
+ */
+export async function createCoordinatorPptx(
+  templatePptxBuffer: ArrayBuffer,
+  coordinatorName: string,
+  eventName: string,
+  eventDate: string
+): Promise<ArrayBuffer> {
+  const zip = await JSZip.loadAsync(templatePptxBuffer);
+  const slideFiles = Object.keys(zip.files).filter(
+    (f) => f.startsWith("ppt/slides/slide") && f.endsWith(".xml")
+  );
+
+  const formattedName = formatCertificateName(coordinatorName);
+  const formattedDate = formatOrdinalDate(eventDate);
+
+  for (const slidePath of slideFiles) {
+    let xml = await zip.file(slidePath)!.async("text");
+
+    // Replace name tags: <<name>>, {name}, Coordinator Name, etc.
+    xml = xml.replace(
+      /(<<name>>|&lt;&lt;name&gt;&gt;|<name>|&lt;name&gt;|\{\{name\}\}|\{name\}|\[name\])/gi,
+      formattedName
+    );
+    xml = xml.replace(
+      /\b(Coordinator\s+Name|Participant\s+Name|Student\s+Name|Candidate\s+Name|Full\s+Name)\b/gi,
+      formattedName
+    );
+
+    // Replace event tags: <<event>>, {event}, {event_name}
+    xml = xml.replace(
+      /(<<event>>|&lt;&lt;event&gt;&gt;|<<event_name>>|&lt;&lt;event_name&gt;&gt;|<event>|\{\{event\}\}|\{event\}|\{event_name\}|\[event\])/gi,
+      eventName
+    );
+
+    // Replace date tags: <<date>>, {date}
+    xml = xml.replace(
+      /(<<date>>|&lt;&lt;date&gt;&gt;|<date>|\{\{date\}\}|\{date\}|\[date\])/gi,
+      formattedDate
+    );
+
+    zip.file(slidePath, xml);
+  }
+
+  return await zip.generateAsync({ type: "arraybuffer" });
+}
+
+/**
  * Format date with ordinal day (e.g. "September 17th 2026")
  */
 export function formatOrdinalDate(dateStr: string): string {
@@ -787,27 +877,29 @@ export function formatOrdinalDate(dateStr: string): string {
 
 /**
  * Generates high-res raster data URL for official CSI RSET Coordinator Appreciation Certificate
- * using the pre-baked official template image with dynamic coordinator name, event, and date.
+ * using the pre-baked official template image (or uploaded custom template) with dynamic coordinator name, event, and date.
  */
 export async function generateCoordinatorCertificateDataUrl(
   event: CSIEvent,
-  coordinatorName: string
+  coordinatorName: string,
+  customTemplateImage?: string
 ): Promise<string> {
+  const baseImgSrc = customTemplateImage || COORDINATOR_TEMPLATE_BASE64;
   if (typeof window === "undefined" || typeof document === "undefined") {
-    return COORDINATOR_TEMPLATE_BASE64;
+    return baseImgSrc;
   }
 
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
   canvas.height = 725;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return COORDINATOR_TEMPLATE_BASE64;
+  if (!ctx) return baseImgSrc;
 
   const img = new Image();
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve();
     img.onerror = () => reject(new Error("Failed to load template image"));
-    img.src = COORDINATOR_TEMPLATE_BASE64;
+    img.src = baseImgSrc;
   });
 
   // 1. Draw base clean template
@@ -816,7 +908,21 @@ export async function generateCoordinatorCertificateDataUrl(
   const formattedName = formatCertificateName(coordinatorName);
   const formattedDate = formatOrdinalDate(event.event_date);
 
-  // 2. Render Coordinator Name in gold script font
+  // If custom template image is uploaded, stamp dynamic coordinator name prominently
+  if (customTemplateImage) {
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = 'italic 52px "Brush Script MT", "Great Vibes", "Playfair Display", "Georgia", "Times New Roman", cursive';
+    ctx.fillStyle = "#C99B3B";
+    ctx.shadowColor = "rgba(180, 130, 40, 0.25)";
+    ctx.shadowBlur = 4;
+    ctx.fillText(formattedName, 512, 368);
+    ctx.restore();
+    return canvas.toDataURL("image/png");
+  }
+
+  // 2. Render Coordinator Name in gold script font (Default official template)
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -912,27 +1018,70 @@ export async function generateCoordinatorCertificateDataUrl(
 export async function renderCoordinatorCertificate(
   doc: jsPDF,
   event: CSIEvent,
-  coordinatorName: string
+  coordinatorName: string,
+  customTemplateImage?: string
 ) {
-  const dataUrl = await generateCoordinatorCertificateDataUrl(event, coordinatorName);
+  const dataUrl = await generateCoordinatorCertificateDataUrl(event, coordinatorName, customTemplateImage);
   doc.addImage(dataUrl, "PNG", 0, 0, 297, 210);
 }
 
 /**
- * Export single Coordinator Certificate as PDF
+ * Export single Coordinator Certificate as PDF (supports PPTX COM or custom image / default)
  */
 export async function exportCoordinatorCertificatePdf(
   event: CSIEvent,
-  coordinatorName: string
+  coordinatorName: string,
+  customTemplateImage?: string,
+  pptxBuffer?: ArrayBuffer
 ) {
+  const formattedName = formatCertificateName(coordinatorName);
+  const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim() || "Coordinator";
+
+  // If PPTX buffer provided, use PowerPoint COM conversion
+  if (pptxBuffer) {
+    try {
+      const customizedPptx = await createCoordinatorPptx(
+        pptxBuffer,
+        coordinatorName,
+        event.event_name,
+        event.event_date
+      );
+      const b64 = arrayBufferToBase64(customizedPptx);
+
+      const res = await fetch("/api/convert-pptx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "batch_convert",
+          items: [{ name: safeName, pptxBase64: b64 }],
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.convertedPdfs?.[0]?.pdfBase64) {
+        const pdfBytes = base64ToUint8Array(data.convertedPdfs[0].pdfBase64);
+        const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${safeName} - Coordinator Certificate.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+    } catch (err) {
+      console.warn("PowerPoint COM conversion failed, falling back to jsPDF:", err);
+    }
+  }
+
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "mm",
     format: "a4",
   });
-  await renderCoordinatorCertificate(doc, event, coordinatorName);
-  const formattedName = formatCertificateName(coordinatorName);
-  const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim() || "Coordinator";
+  await renderCoordinatorCertificate(doc, event, coordinatorName, customTemplateImage);
   doc.save(`${safeName} - Coordinator Certificate.pdf`);
 }
 
@@ -941,10 +1090,68 @@ export async function exportCoordinatorCertificatePdf(
  */
 export async function exportCoordinatorCertificatesZip(
   event: CSIEvent,
-  coordinatorNames: string[]
+  coordinatorNames: string[],
+  customTemplateImage?: string,
+  pptxBuffer?: ArrayBuffer
 ): Promise<number> {
   const zip = new JSZip();
 
+  // If PPTX buffer provided, convert all coordinators via PowerPoint COM
+  if (pptxBuffer) {
+    try {
+      const itemsToConvert: { name: string; pptxBase64: string }[] = [];
+      for (const name of coordinatorNames) {
+        if (!name.trim()) continue;
+        const formattedName = formatCertificateName(name);
+        const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim() || "Coordinator";
+        const customizedPptx = await createCoordinatorPptx(
+          pptxBuffer,
+          name,
+          event.event_name,
+          event.event_date
+        );
+        itemsToConvert.push({
+          name: safeName,
+          pptxBase64: arrayBufferToBase64(customizedPptx),
+        });
+      }
+
+      if (itemsToConvert.length > 0) {
+        const res = await fetch("/api/convert-pptx", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "batch_convert",
+            items: itemsToConvert,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success && data.convertedPdfs && data.convertedPdfs.length > 0) {
+          for (const conv of data.convertedPdfs) {
+            const pdfBytes = base64ToUint8Array(conv.pdfBase64);
+            zip.file(`${conv.name} - Coordinator Certificate.pdf`, pdfBytes);
+          }
+
+          const blob = await zip.generateAsync({ type: "blob" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          const cleanEvent = event.event_name.replace(/[^a-zA-Z0-9_-]/g, "_");
+          a.download = `Coordinator_Certificates_${cleanEvent}.zip`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          return itemsToConvert.length;
+        }
+      }
+    } catch (err) {
+      console.warn("PowerPoint batch conversion failed, falling back to jsPDF:", err);
+    }
+  }
+
+  // Default / Image template fallback
   for (const name of coordinatorNames) {
     if (!name.trim()) continue;
     const doc = new jsPDF({
@@ -952,7 +1159,7 @@ export async function exportCoordinatorCertificatesZip(
       unit: "mm",
       format: "a4",
     });
-    await renderCoordinatorCertificate(doc, event, name);
+    await renderCoordinatorCertificate(doc, event, name, customTemplateImage);
     const pdfData = doc.output("arraybuffer");
     const formattedName = formatCertificateName(name);
     const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim() || "Coordinator";
