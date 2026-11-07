@@ -48,7 +48,7 @@ export default function Home() {
     {
       label: "PLATFORM STATUS",
       value: "Online",
-      sub: "CSI Branch Operational",
+      sub: "CSI Chapter Active",
       borderColor: "border-t-pink-500",
       icon: Activity,
     },
@@ -61,10 +61,6 @@ export default function Home() {
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Overview Dashboard</h1>
           <p className="text-slate-300 text-lg mt-1">High-level executive overview of CSI chapter operations</p>
-        </div>
-        <div className="flex items-center space-x-2.5 bg-[#12101C] px-4 py-2 rounded-full border border-purple-500/30">
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
-          <span className="text-sm text-slate-200 font-bold">All Systems Operational</span>
         </div>
       </div>
 

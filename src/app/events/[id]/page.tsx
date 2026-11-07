@@ -761,6 +761,16 @@ export default function EventContainerPage() {
     }
   }, [eventId]);
 
+  useEffect(() => {
+    if (isUnlocked && event && (selectedCoordinator || (event.assigned_coordinators && event.assigned_coordinators[0]))) {
+      const target = selectedCoordinator || event.assigned_coordinators[0];
+      if (!selectedCoordinator) setSelectedCoordinator(target);
+      generateCoordinatorCertificateDataUrl(event, target).then((url) => {
+        setCoordinatorPreviewUrl(url);
+      });
+    }
+  }, [isUnlocked, selectedCoordinator, event]);
+
   if (!event) {
     return (
       <div className="p-12 text-center space-y-4">
@@ -825,16 +835,6 @@ export default function EventContainerPage() {
       setEasterEggError(true);
     }
   };
-
-  useEffect(() => {
-    if (isUnlocked && event && (selectedCoordinator || (event.assigned_coordinators && event.assigned_coordinators[0]))) {
-      const target = selectedCoordinator || event.assigned_coordinators[0];
-      if (!selectedCoordinator) setSelectedCoordinator(target);
-      generateCoordinatorCertificateDataUrl(event, target).then((url) => {
-        setCoordinatorPreviewUrl(url);
-      });
-    }
-  }, [isUnlocked, selectedCoordinator, event]);
 
   const handleDownloadSingleCoordinator = async (name: string) => {
     if (!event) return;

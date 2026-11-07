@@ -140,14 +140,9 @@ export default function EventsArchivePage() {
       {/* Header with Title and Create Action */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-csi-border pb-6">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-3xl font-extrabold text-white tracking-tight">
-              Events Hosted Archive
-            </h1>
-            <span className="text-xs px-3 py-1 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
-              Phase 7 • Master Archive
-            </span>
-          </div>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">
+            Events Hosted Archive
+          </h1>
           <p className="text-slate-300 text-[16px] mt-1.5 max-w-3xl">
             Comprehensive history and active operations container repository for all technical competitions, workshops, and flagship events hosted by Computer Society of India (CSI) SB RSET.
           </p>
@@ -163,7 +158,7 @@ export default function EventsArchivePage() {
       </div>
 
       {/* KPI Summary Metrics Banner */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-5 shadow-xl flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0">
             <Trophy className="w-6 h-6" />
@@ -197,18 +192,6 @@ export default function EventsArchivePage() {
               Completed Events
             </span>
             <span className="text-2xl font-black text-emerald-300 font-mono">{metrics.completedEvents}</span>
-          </div>
-        </div>
-
-        <div className="bg-[#12101C] rounded-2xl border border-amber-500/30 p-5 shadow-xl flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shrink-0">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-              Coordinators Mobilized
-            </span>
-            <span className="text-2xl font-black text-amber-300 font-mono">{metrics.coordinatorsMobilized}</span>
           </div>
         </div>
       </div>
