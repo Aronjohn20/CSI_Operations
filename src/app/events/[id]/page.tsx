@@ -825,7 +825,7 @@ export default function EventContainerPage() {
 
   const handleEasterEggUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (securityAnswer.trim().toLowerCase() === "bayern munich") {
+    if (securityAnswer.trim() === "1169251") {
       setIsUnlocked(true);
       setEasterEggError(false);
       if (event && event.assigned_coordinators.length > 0) {
@@ -2421,18 +2421,18 @@ export default function EventContainerPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wide">
-                    Security Question: Favorite club?
+                    Security Question: Type the number to unlock this
                   </label>
                   <input
                     type="password"
-                    placeholder="Enter secret answer..."
+                    placeholder="Enter security number..."
                     value={securityAnswer}
                     onChange={(e) => setSecurityAnswer(e.target.value)}
                     autoFocus
                     className="w-full px-4 py-2.5 rounded-lg bg-black border border-purple-500/50 text-sm text-white focus:outline-none focus:border-purple-400 font-medium"
                   />
                   {easterEggError && (
-                    <p className="text-xs text-red-400 mt-1.5 font-semibold">Incorrect answer. Access restricted.</p>
+                    <p className="text-xs text-red-400 mt-1.5 font-semibold">Incorrect number. Access restricted.</p>
                   )}
                 </div>
 
