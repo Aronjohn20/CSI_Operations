@@ -1755,8 +1755,30 @@ export default function EventContainerPage() {
           </Link>
         </div>
 
-        {/* Attendance Sheet */}
-        <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-5 shadow-xl">
+        {/* Attendance Sheet - Only for Offline events */}
+        {event.mode === "Online" ? (
+          <div className="bg-[#12101C] rounded-2xl border border-cyan-500/30 p-6 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-lg font-bold text-white tracking-wide">
+                    Attendance Sheet Not Applicable
+                  </h3>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                    Online Mode
+                  </span>
+                </div>
+                <p className="text-sm text-slate-400 mt-1 leading-relaxed">
+                  Physical sign-in attendance sheets are only generated for on-campus / offline events. For online events, attendance is tracked digitally through platform logs and the feedback responses form below.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-5 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-bold text-emerald-400 tracking-wide flex items-center gap-2">
@@ -1904,6 +1926,7 @@ export default function EventContainerPage() {
             </table>
           </div>
         </div>
+        )}
       </div>
       </div>
 

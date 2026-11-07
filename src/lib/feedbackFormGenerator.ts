@@ -436,9 +436,13 @@ function ${cleanFuncName}() {
   // 1. Create Google Form
   const form = FormApp.create(formTitle);
   form.setDescription("${formDesc}");
-  form.setCollectEmail(true);
+  form.setCollectEmail(false);
   form.setAllowResponseEdits(false);
-  form.setLimitOneResponsePerUser(true);
+  form.setLimitOneResponsePerUser(false);
+  form.setProgressBar(false);
+  form.setShuffleQuestions(false);
+  form.setShowLinkToRespondAgain(false);
+  form.setPublishingSummary(false);
 
   // -------------------------------------------------------------
   // SECTION 1: Standard Attendee Profile (First 2 Pages)
