@@ -822,9 +822,9 @@ export async function createCoordinatorPptx(
   for (const slidePath of slideFiles) {
     let xml = await zip.file(slidePath)!.async("text");
 
-    // Replace name tags: <<name>>, {name}, Coordinator Name, etc.
+    // Replace name tags:
     xml = xml.replace(
-      /(<<name>>|&lt;&lt;name&gt;&gt;|<name>|&lt;name&gt;|\{\{name\}\}|\{name\}|\[name\])/gi,
+      /(<<\s*(?:coordinator(?:\s|_)?name|name)\s*>>|&lt;&lt;\s*(?:coordinator(?:\s|_)?name|name)\s*&gt;&gt;|\{\{\s*(?:coordinator(?:\s|_)?name|name)\s*\}\}|\{\s*(?:coordinator(?:\s|_)?name|name)\s*\}|\[\s*(?:coordinator(?:\s|_)?name|name|student(?:\s|_)?name|candidate(?:\s|_)?name|participant(?:\s|_)?name|full(?:\s|_)?name)\s*\])/gi,
       formattedName
     );
     xml = xml.replace(
@@ -832,17 +832,19 @@ export async function createCoordinatorPptx(
       formattedName
     );
 
-    // Replace event tags: <<event>>, {event}, {event_name}
+    // Replace event tags:
     xml = xml.replace(
-      /(<<event>>|&lt;&lt;event&gt;&gt;|<<event_name>>|&lt;&lt;event_name&gt;&gt;|<event>|\{\{event\}\}|\{event\}|\{event_name\}|\[event\])/gi,
+      /(<<\s*(?:event(?:\s|_)?name|event)\s*>>|&lt;&lt;\s*(?:event(?:\s|_)?name|event)\s*&gt;&gt;|\{\{\s*(?:event(?:\s|_)?name|event)\s*\}\}|\{\s*(?:event(?:\s|_)?name|event)\s*\}|\[\s*(?:event(?:\s|_)?name|event)\s*\])/gi,
       eventName
     );
+    xml = xml.replace(/\bEvent\s+Name\b/gi, eventName);
 
-    // Replace date tags: <<date>>, {date}
+    // Replace date tags:
     xml = xml.replace(
-      /(<<date>>|&lt;&lt;date&gt;&gt;|<date>|\{\{date\}\}|\{date\}|\[date\])/gi,
+      /(<<\s*(?:event(?:\s|_)?date|date)\s*>>|&lt;&lt;\s*(?:event(?:\s|_)?date|date)\s*&gt;&gt;|\{\{\s*(?:event(?:\s|_)?date|date)\s*\}\}|\{\s*(?:event(?:\s|_)?date|date)\s*\}|\[\s*(?:event(?:\s|_)?date|date)\s*\])/gi,
       formattedDate
     );
+    xml = xml.replace(/\bEvent\s+Date\b/gi, formattedDate);
 
     zip.file(slidePath, xml);
   }
@@ -908,18 +910,25 @@ export async function generateCoordinatorCertificateDataUrl(
   const formattedName = formatCertificateName(coordinatorName);
   const formattedDate = formatOrdinalDate(event.event_date);
 
-  // If custom template image is uploaded, stamp dynamic coordinator name prominently
+  // If custom template image is uploaded, clear any placeholder name and writeup areas
+  // using the template's background color so new dynamic values replace them cleanly!
   if (customTemplateImage) {
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = 'italic 52px "Brush Script MT", "Great Vibes", "Playfair Display", "Georgia", "Times New Roman", cursive';
-    ctx.fillStyle = "#C99B3B";
-    ctx.shadowColor = "rgba(180, 130, 40, 0.25)";
-    ctx.shadowBlur = 4;
-    ctx.fillText(formattedName, 512, 368);
-    ctx.restore();
-    return canvas.toDataURL("image/png");
+    try {
+      const sample = ctx.getImageData(512, 336, 1, 1).data;
+      if (sample && sample[3] > 0) {
+        ctx.fillStyle = `rgb(${sample[0]}, ${sample[1]}, ${sample[2]})`;
+      } else {
+        ctx.fillStyle = "#FFFFFF";
+      }
+    } catch {
+      ctx.fillStyle = "#FFFFFF";
+    }
+
+    // Clear name placeholder area (e.g. "[Coordinator Name]", "[Name]", etc.)
+    ctx.fillRect(160, 325, 704, 75);
+
+    // Clear writeup placeholder area (e.g. "[Event Name]", "[Date]", etc.)
+    ctx.fillRect(160, 422, 704, 96);
   }
 
   // 2. Render Coordinator Name in gold script font (Default official template)
