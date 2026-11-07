@@ -36,6 +36,7 @@ import {
   Sliders,
   HelpCircle,
   ChevronDown,
+  X,
 } from "lucide-react";
 import QRCode from "qrcode";
 import {
@@ -2393,9 +2394,24 @@ export default function EventContainerPage() {
       )}
 
       {isEasterEggOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className={`bg-[#12101C] border border-purple-500/40 w-full rounded-2xl p-6 space-y-5 shadow-2xl transition-all ${isUnlocked ? "max-w-4xl my-8" : "max-w-md"}`}>
-            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsEasterEggOpen(false);
+              setIsUnlocked(false);
+              setSecurityAnswer("");
+              setEasterEggError(false);
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto"
+        >
+          <div
+            className={`bg-[#12101C] border border-purple-500/40 w-full rounded-2xl shadow-2xl transition-all flex flex-col overflow-hidden ${
+              isUnlocked ? "max-w-4xl max-h-[92vh] my-4" : "max-w-md my-auto"
+            }`}
+          >
+            {/* Sticky Header with Always-Visible Close Button */}
+            <div className="flex items-center justify-between border-b border-purple-500/30 px-6 py-4 bg-[#0E0C17] rounded-t-2xl shrink-0 sticky top-0 z-10">
               <div className="flex items-center gap-2.5 text-white font-bold text-base">
                 <ShieldCheck className="w-5 h-5 text-purple-400" />
                 <span>{isUnlocked ? "Official Coordinator Certificate Studio" : "Admin Privileged Gate"}</span>
@@ -2407,149 +2423,175 @@ export default function EventContainerPage() {
                   setSecurityAnswer("");
                   setEasterEggError(false);
                 }}
-                className="text-slate-400 hover:text-white text-lg font-bold p-1 rounded-lg hover:bg-white/10 transition"
+                className="px-3 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/80 border border-red-500/40 text-red-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                title="Close Window"
               >
-                ✕
+                <X className="w-4 h-4 text-red-300" />
+                <span>Close</span>
               </button>
             </div>
 
-            {!isUnlocked ? (
-              <form onSubmit={handleEasterEggUnlock} className="space-y-4">
-                <p className="text-sm text-slate-300 leading-relaxed">
-                  Security verification required to unlock Coordinator Appreciation Certificate generation.
-                </p>
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-5">
+              {!isUnlocked ? (
+                <form onSubmit={handleEasterEggUnlock} className="space-y-4">
+                  <p className="text-sm text-slate-300 leading-relaxed">
+                    Security verification required to unlock Coordinator Appreciation Certificate generation.
+                  </p>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wide">
-                    Security Question: Type the number to unlock this
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="Enter security number..."
-                    value={securityAnswer}
-                    onChange={(e) => setSecurityAnswer(e.target.value)}
-                    autoFocus
-                    className="w-full px-4 py-2.5 rounded-lg bg-black border border-purple-500/50 text-sm text-white focus:outline-none focus:border-purple-400 font-medium"
-                  />
-                  {easterEggError && (
-                    <p className="text-xs text-red-400 mt-1.5 font-semibold">Incorrect number. Access restricted.</p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-purple-600/30 transition"
-                >
-                  Verify Admin Identity
-                </button>
-              </form>
-            ) : (
-              <div className="space-y-6">
-                <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                    <span>Identity verified! Official CSI SB RSET Coordinator template loaded.</span>
-                  </div>
-                  <button
-                    onClick={handleDownloadAllCoordinators}
-                    disabled={isGeneratingCoordinatorCerts || !event.assigned_coordinators.length}
-                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center justify-center gap-2 shrink-0 disabled:opacity-50"
-                  >
-                    {isGeneratingCoordinatorCerts ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Download className="w-4 h-4" />
-                    )}
-                    <span>Download All Coordinators ZIP</span>
-                  </button>
-                </div>
-
-                {/* Coordinator selector pills */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-bold text-purple-300 uppercase tracking-wide">
-                      Select Coordinator to Preview:
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wide">
+                      Security Question: Type the number to unlock this
                     </label>
-                    <span className="text-xs text-slate-400">
-                      {event.assigned_coordinators.length} assigned
-                    </span>
+                    <input
+                      type="password"
+                      placeholder="Enter security number..."
+                      value={securityAnswer}
+                      onChange={(e) => setSecurityAnswer(e.target.value)}
+                      autoFocus
+                      className="w-full px-4 py-2.5 rounded-lg bg-black border border-purple-500/50 text-sm text-white focus:outline-none focus:border-purple-400 font-medium"
+                    />
+                    {easterEggError && (
+                      <p className="text-xs text-red-400 mt-1.5 font-semibold">Incorrect number. Access restricted.</p>
+                    )}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {event.assigned_coordinators.map((name) => {
-                      const isSelected = (selectedCoordinator || event.assigned_coordinators[0]) === name;
-                      return (
-                        <button
-                          key={name}
-                          onClick={() => setSelectedCoordinator(name)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
-                            isSelected
-                              ? "bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-600/30"
-                              : "bg-black/60 text-slate-300 border-purple-500/30 hover:border-purple-400"
-                          }`}
-                        >
-                          {name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
-                {/* Live Certificate Preview */}
-                <div className="bg-black/90 rounded-xl border border-purple-500/40 p-4 space-y-3">
-                  <div className="flex items-center justify-between text-xs text-slate-400 border-b border-purple-500/20 pb-2">
-                    <span className="font-semibold text-slate-200">
-                      Live Certificate Preview: <span className="text-amber-400 font-bold">{selectedCoordinator || event.assigned_coordinators[0]}</span>
-                    </span>
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-purple-600/30 transition"
+                  >
+                    Verify Admin Identity
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <span>Identity verified! Official CSI SB RSET Coordinator template loaded.</span>
+                    </div>
                     <button
-                      onClick={() => handleDownloadSingleCoordinator(selectedCoordinator || event.assigned_coordinators[0])}
-                      disabled={isGeneratingCoordinatorCerts}
-                      className="px-3 py-1 bg-purple-600/40 hover:bg-purple-600 text-purple-200 hover:text-white rounded-md text-xs font-bold transition flex items-center gap-1.5"
+                      onClick={handleDownloadAllCoordinators}
+                      disabled={isGeneratingCoordinatorCerts || !event.assigned_coordinators.length}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center justify-center gap-2 shrink-0 disabled:opacity-50"
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download this PDF</span>
+                      {isGeneratingCoordinatorCerts ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      <span>Download All Coordinators ZIP</span>
                     </button>
                   </div>
 
-                  <div className="relative w-full aspect-[1024/725] rounded-lg overflow-hidden bg-white/5 border border-purple-500/20 flex items-center justify-center">
-                    {coordinatorPreviewUrl ? (
-                      <img
-                        src={coordinatorPreviewUrl}
-                        alt="Coordinator Certificate Preview"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center gap-2 text-slate-400 text-xs">
-                        <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
-                        <span>Rendering certificate preview...</span>
-                      </div>
-                    )}
+                  {/* Coordinator selector pills */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-purple-300 uppercase tracking-wide">
+                        Select Coordinator to Preview:
+                      </label>
+                      <span className="text-xs text-slate-400">
+                        {event.assigned_coordinators.length} assigned
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {event.assigned_coordinators.map((name) => {
+                        const isSelected = (selectedCoordinator || event.assigned_coordinators[0]) === name;
+                        return (
+                          <button
+                            key={name}
+                            onClick={() => setSelectedCoordinator(name)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
+                              isSelected
+                                ? "bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-600/30"
+                                : "bg-black/60 text-slate-300 border-purple-500/30 hover:border-purple-400"
+                            }`}
+                          >
+                            {name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                {/* Coordinators List with Individual Download Actions */}
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-white uppercase tracking-wider">
-                    All Assigned Coordinators ({event.assigned_coordinators.length}):
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
-                    {event.assigned_coordinators.map((name) => (
-                      <div
-                        key={name}
-                        className="p-3 rounded-lg bg-black border border-purple-500/30 flex items-center justify-between gap-2"
+                  {/* Live Certificate Preview */}
+                  <div className="bg-black/90 rounded-xl border border-purple-500/40 p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-slate-400 border-b border-purple-500/20 pb-2">
+                      <span className="font-semibold text-slate-200">
+                        Live Certificate Preview: <span className="text-amber-400 font-bold">{selectedCoordinator || event.assigned_coordinators[0]}</span>
+                      </span>
+                      <button
+                        onClick={() => handleDownloadSingleCoordinator(selectedCoordinator || event.assigned_coordinators[0])}
+                        disabled={isGeneratingCoordinatorCerts}
+                        className="px-3 py-1 bg-purple-600/40 hover:bg-purple-600 text-purple-200 hover:text-white rounded-md text-xs font-bold transition flex items-center gap-1.5"
                       >
-                        <span className="text-white text-sm font-semibold truncate">{name}</span>
-                        <button
-                          onClick={() => handleDownloadSingleCoordinator(name)}
-                          disabled={isGeneratingCoordinatorCerts}
-                          className="px-3 py-1.5 rounded-md bg-purple-600/40 hover:bg-purple-600 text-purple-200 hover:text-white text-xs font-bold transition flex items-center gap-1 shrink-0"
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download this PDF</span>
+                      </button>
+                    </div>
+
+                    <div className="relative w-full aspect-[1024/725] rounded-lg overflow-hidden bg-white/5 border border-purple-500/20 flex items-center justify-center">
+                      {coordinatorPreviewUrl ? (
+                        <img
+                          src={coordinatorPreviewUrl}
+                          alt="Coordinator Certificate Preview"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-2 text-slate-400 text-xs">
+                          <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+                          <span>Rendering certificate preview...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Coordinators List with Individual Download Actions */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-white uppercase tracking-wider">
+                      All Assigned Coordinators ({event.assigned_coordinators.length}):
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                      {event.assigned_coordinators.map((name) => (
+                        <div
+                          key={name}
+                          className="p-3 rounded-lg bg-black border border-purple-500/30 flex items-center justify-between gap-2"
                         >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>PDF</span>
-                        </button>
-                      </div>
-                    ))}
+                          <span className="text-white text-sm font-semibold truncate">{name}</span>
+                          <button
+                            onClick={() => handleDownloadSingleCoordinator(name)}
+                            disabled={isGeneratingCoordinatorCerts}
+                            className="px-3 py-1.5 rounded-md bg-purple-600/40 hover:bg-purple-600 text-purple-200 hover:text-white text-xs font-bold transition flex items-center gap-1 shrink-0"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>PDF</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* Bottom Footer with prominent Close button when unlocked */}
+            {isUnlocked && (
+              <div className="border-t border-purple-500/30 px-6 py-3.5 bg-[#0E0C17] rounded-b-2xl shrink-0 flex items-center justify-between">
+                <span className="text-xs text-slate-400">
+                  CSI SB RSET Coordinator Studio
+                </span>
+                <button
+                  onClick={() => {
+                    setIsEasterEggOpen(false);
+                    setIsUnlocked(false);
+                    setSecurityAnswer("");
+                    setEasterEggError(false);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 border border-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Close Studio</span>
+                </button>
               </div>
             )}
           </div>
