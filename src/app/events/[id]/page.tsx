@@ -37,8 +37,6 @@ import {
   HelpCircle,
   ChevronDown,
   X,
-  Upload,
-  RotateCcw,
 } from "lucide-react";
 import QRCode from "qrcode";
 import {
@@ -65,14 +63,6 @@ import {
 import {
   exportSingleCertificatePdf,
   exportBatchCertificatesPdf,
-  exportCoordinatorCertificatePdf,
-  exportCoordinatorCertificatesZip,
-  generateCoordinatorCertificateDataUrl,
-  extractPptxData,
-  arrayBufferToBase64,
-  base64ToUint8Array,
-  convertPdfToImageDataUrl,
-  createCoordinatorPptx,
 } from "@/lib/certificateExport";
 import {
   exportRsmsPdf,
@@ -92,19 +82,6 @@ export default function EventContainerPage() {
 
   const [event, setEvent] = useState<CSIEvent | null>(null);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
-
-  // Easter Egg & Coordinator Certificates State
-  const [isEasterEggOpen, setIsEasterEggOpen] = useState(false);
-  const [securityAnswer, setSecurityAnswer] = useState("");
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [easterEggError, setEasterEggError] = useState(false);
-  const [selectedCoordinator, setSelectedCoordinator] = useState<string>("");
-  const [coordinatorPreviewUrl, setCoordinatorPreviewUrl] = useState<string | null>(null);
-  const [isGeneratingCoordinatorCerts, setIsGeneratingCoordinatorCerts] = useState(false);
-  const [coordinatorCustomTemplate, setCoordinatorCustomTemplate] = useState<string>("");
-  const [coordinatorTemplateFileName, setCoordinatorTemplateFileName] = useState<string>("");
-  const [coordinatorPptxFile, setCoordinatorPptxFile] = useState<{ buffer: ArrayBuffer; name: string } | null>(null);
-  const [isUploadingCoordinatorTemplate, setIsUploadingCoordinatorTemplate] = useState(false);
 
   const handleDeleteEvent = () => {
     if (!event) return;
@@ -773,66 +750,6 @@ export default function EventContainerPage() {
     }
   }, [eventId]);
 
-  useEffect(() => {
-    if (!eventId) return;
-    try {
-      const savedImg = sessionStorage.getItem(`csi_coord_template_${eventId}`);
-      const savedName = sessionStorage.getItem(`csi_coord_template_name_${eventId}`);
-      const savedPptxB64 = sessionStorage.getItem(`csi_coord_pptx_${eventId}`);
-      if (savedImg) setCoordinatorCustomTemplate(savedImg);
-      if (savedName) setCoordinatorTemplateFileName(savedName);
-      if (savedPptxB64) {
-        const bytes = base64ToUint8Array(savedPptxB64);
-        setCoordinatorPptxFile({ buffer: bytes.buffer as ArrayBuffer, name: savedName || "template.pptx" });
-      }
-    } catch {}
-  }, [eventId]);
-
-  useEffect(() => {
-    if (isUnlocked && event && (selectedCoordinator || (event.assigned_coordinators && event.assigned_coordinators[0]))) {
-      const target = selectedCoordinator || event.assigned_coordinators[0];
-      if (!selectedCoordinator) setSelectedCoordinator(target);
-
-      if (coordinatorPptxFile?.buffer) {
-        let isCancelled = false;
-        createCoordinatorPptx(
-          coordinatorPptxFile.buffer,
-          target,
-          event.event_name,
-          event.event_date
-        )
-          .then((customizedPptx) => {
-            const b64 = arrayBufferToBase64(customizedPptx);
-            return fetch("/api/convert-pptx", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "preview", pptxBase64: b64 }),
-            });
-          })
-          .then((r) => r.json())
-          .then((data) => {
-            if (!isCancelled && data.success && data.previewImage) {
-              setCoordinatorPreviewUrl(data.previewImage);
-            }
-          })
-          .catch((err) => {
-            console.warn("PPTX coordinator preview failed:", err);
-          });
-        return () => {
-          isCancelled = true;
-        };
-      } else {
-        generateCoordinatorCertificateDataUrl(
-          event,
-          target,
-          coordinatorCustomTemplate || undefined
-        ).then((url) => {
-          setCoordinatorPreviewUrl(url);
-        });
-      }
-    }
-  }, [isUnlocked, selectedCoordinator, event, coordinatorCustomTemplate, coordinatorPptxFile]);
-
   if (!event) {
     return (
       <div className="p-12 text-center space-y-4">
@@ -885,165 +802,6 @@ export default function EventContainerPage() {
   // RSMS Notice description (Standard format from approved template without brief description/impromptu)
   const rsmsDescription = `The Computer Society of India SB RSET, is conducting ${event.mode === "Online" ? "an online competition" : "a technical event"}, ${event.event_name}, for students of all years.`;
 
-  const handleEasterEggUnlock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (securityAnswer.trim() === "1169251") {
-      setIsUnlocked(true);
-      setEasterEggError(false);
-      if (event && event.assigned_coordinators.length > 0) {
-        setSelectedCoordinator(event.assigned_coordinators[0]);
-      }
-    } else {
-      setEasterEggError(true);
-    }
-  };
-
-  const handleDownloadSingleCoordinator = async (name: string) => {
-    if (!event) return;
-    setIsGeneratingCoordinatorCerts(true);
-    try {
-      await exportCoordinatorCertificatePdf(
-        event,
-        name,
-        coordinatorCustomTemplate || undefined,
-        coordinatorPptxFile?.buffer
-      );
-    } catch (err) {
-      console.error(err);
-      alert("Failed to export coordinator certificate.");
-    } finally {
-      setIsGeneratingCoordinatorCerts(false);
-    }
-  };
-
-  const handleDownloadAllCoordinators = async () => {
-    if (!event || !event.assigned_coordinators.length) return;
-    setIsGeneratingCoordinatorCerts(true);
-    try {
-      await exportCoordinatorCertificatesZip(
-        event,
-        event.assigned_coordinators,
-        coordinatorCustomTemplate || undefined,
-        coordinatorPptxFile?.buffer
-      );
-    } catch (err) {
-      console.error(err);
-      alert("Failed to batch export coordinator certificates.");
-    } finally {
-      setIsGeneratingCoordinatorCerts(false);
-    }
-  };
-
-  const handleCoordinatorTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !eventId) return;
-
-    setIsUploadingCoordinatorTemplate(true);
-    try {
-      const lowerName = file.name.toLowerCase();
-      if (lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt")) {
-        const buffer = await file.arrayBuffer();
-        setCoordinatorPptxFile({ buffer, name: file.name });
-        setCoordinatorTemplateFileName(file.name);
-        setCoordinatorCustomTemplate("");
-
-        try {
-          const b64 = arrayBufferToBase64(buffer);
-          sessionStorage.setItem(`csi_coord_pptx_${eventId}`, b64);
-          sessionStorage.setItem(`csi_coord_template_name_${eventId}`, file.name);
-          sessionStorage.removeItem(`csi_coord_template_${eventId}`);
-        } catch (storageErr) {
-          console.warn("Could not save PPTX template to sessionStorage:", storageErr);
-        }
-
-        const target = selectedCoordinator || (event?.assigned_coordinators && event.assigned_coordinators[0]) || "Coordinator";
-        if (event) {
-          const customizedPptx = await createCoordinatorPptx(buffer, target, event.event_name, event.event_date);
-          const b64Cust = arrayBufferToBase64(customizedPptx);
-          const res = await fetch("/api/convert-pptx", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "preview", pptxBase64: b64Cust }),
-          });
-          const data = await res.json();
-          if (data.success && data.previewImage) {
-            setCoordinatorPreviewUrl(data.previewImage);
-          }
-        }
-      } else if (lowerName.endsWith(".pdf")) {
-        const buffer = await file.arrayBuffer();
-        const dataUrl = await convertPdfToImageDataUrl(buffer);
-        setCoordinatorCustomTemplate(dataUrl);
-        setCoordinatorTemplateFileName(file.name);
-        setCoordinatorPptxFile(null);
-
-        try {
-          sessionStorage.setItem(`csi_coord_template_${eventId}`, dataUrl);
-          sessionStorage.setItem(`csi_coord_template_name_${eventId}`, file.name);
-          sessionStorage.removeItem(`csi_coord_pptx_${eventId}`);
-        } catch (storageErr) {
-          console.warn("Could not save PDF image template to sessionStorage:", storageErr);
-        }
-
-        const target = selectedCoordinator || (event?.assigned_coordinators && event.assigned_coordinators[0]) || "Coordinator";
-        if (event) {
-          const previewUrl = await generateCoordinatorCertificateDataUrl(event, target, dataUrl);
-          setCoordinatorPreviewUrl(previewUrl);
-        }
-      } else {
-        const reader = new FileReader();
-        reader.onload = async (eventReader) => {
-          const dataUrl = eventReader.target?.result as string;
-          if (dataUrl) {
-            setCoordinatorCustomTemplate(dataUrl);
-            setCoordinatorTemplateFileName(file.name);
-            setCoordinatorPptxFile(null);
-
-            try {
-              sessionStorage.setItem(`csi_coord_template_${eventId}`, dataUrl);
-              sessionStorage.setItem(`csi_coord_template_name_${eventId}`, file.name);
-              sessionStorage.removeItem(`csi_coord_pptx_${eventId}`);
-            } catch (storageErr) {
-              console.warn("Could not save image template to sessionStorage:", storageErr);
-            }
-
-            const target = selectedCoordinator || (event?.assigned_coordinators && event.assigned_coordinators[0]) || "Coordinator";
-            if (event) {
-              const previewUrl = await generateCoordinatorCertificateDataUrl(event, target, dataUrl);
-              setCoordinatorPreviewUrl(previewUrl);
-            }
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    } catch (err) {
-      console.error("Failed to load coordinator certificate template:", err);
-      alert("Failed to load template file. Please try another PPTX, PDF, or image file.");
-    } finally {
-      setIsUploadingCoordinatorTemplate(false);
-      e.target.value = "";
-    }
-  };
-
-  const handleResetCoordinatorTemplate = () => {
-    setCoordinatorCustomTemplate("");
-    setCoordinatorTemplateFileName("");
-    setCoordinatorPptxFile(null);
-    if (eventId) {
-      try {
-        sessionStorage.removeItem(`csi_coord_template_${eventId}`);
-        sessionStorage.removeItem(`csi_coord_template_name_${eventId}`);
-        sessionStorage.removeItem(`csi_coord_pptx_${eventId}`);
-      } catch {}
-    }
-    const target = selectedCoordinator || (event?.assigned_coordinators && event.assigned_coordinators[0]) || "Coordinator";
-    if (event) {
-      generateCoordinatorCertificateDataUrl(event, target).then((url) => {
-        setCoordinatorPreviewUrl(url);
-      });
-    }
-  };
-
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
       {/* Top Header Navigation */}
@@ -1071,7 +829,7 @@ export default function EventContainerPage() {
           </div>
         </div>
 
-        {/* Actions & Easter Egg Trigger */}
+        {/* Actions */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleDeleteEvent}
@@ -1080,14 +838,6 @@ export default function EventContainerPage() {
           >
             <Trash2 className="w-4 h-4 text-red-400" />
             <span>Delete Event</span>
-          </button>
-
-          <button
-            onClick={() => setIsEasterEggOpen(true)}
-            title="System Diagnostics (Secret)"
-            className="p-2 text-slate-700 hover:text-slate-400 transition rounded-lg opacity-40 hover:opacity-100"
-          >
-            <Lock className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -2005,34 +1755,6 @@ export default function EventContainerPage() {
           </Link>
         </div>
 
-        {/* Phase 6: Coordinator Appreciation Certificates Studio */}
-        <div className="bg-gradient-to-r from-blue-950/40 via-indigo-950/40 to-[#12101C] rounded-2xl border border-blue-500/40 p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
-                Phase 6 • Post-Event Studio
-              </span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">
-                {event.assigned_coordinators.length} Assigned Coordinators
-              </span>
-            </div>
-            <h3 className="text-xl font-extrabold text-white flex items-center gap-2 pt-1">
-              <ShieldCheck className="w-6 h-6 text-blue-400" />
-              Official Coordinator Appreciation Certificates
-            </h3>
-            <p className="text-slate-300 text-[15px]">
-              Generate official high-resolution certificates for all event coordinators ({event.assigned_coordinators.join(", ") || "None assigned"}) using the verified CSI SB RSET gold &amp; navy template with faculty coordinator signatures.
-            </p>
-          </div>
-          <button
-            onClick={() => setIsEasterEggOpen(true)}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[16px] font-extrabold flex items-center justify-center gap-2.5 transition shadow-xl shadow-blue-600/25 shrink-0"
-          >
-            <span>Coordinator Studio</span>
-            <Lock className="w-5 h-5" />
-          </button>
-        </div>
-
         {/* Attendance Sheet */}
         <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-5 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -2570,268 +2292,6 @@ export default function EventContainerPage() {
                 </div>
               </form>
             </div>
-          </div>
-        </div>
-      )}
-
-      {isEasterEggOpen && (
-        <div
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setIsEasterEggOpen(false);
-              setIsUnlocked(false);
-              setSecurityAnswer("");
-              setEasterEggError(false);
-            }
-          }}
-          className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto"
-        >
-          <div
-            className={`bg-[#12101C] border border-purple-500/40 w-full rounded-2xl shadow-2xl transition-all flex flex-col overflow-hidden ${
-              isUnlocked ? "max-w-4xl max-h-[92vh] my-4" : "max-w-md my-auto"
-            }`}
-          >
-            {/* Sticky Header with Always-Visible Close Button */}
-            <div className="flex items-center justify-between border-b border-purple-500/30 px-6 py-4 bg-[#0E0C17] rounded-t-2xl shrink-0 sticky top-0 z-10">
-              <div className="flex items-center gap-2.5 text-white font-bold text-base">
-                <ShieldCheck className="w-5 h-5 text-purple-400" />
-                <span>{isUnlocked ? "Official Coordinator Certificate Studio" : "Admin Privileged Gate"}</span>
-              </div>
-              <button
-                onClick={() => {
-                  setIsEasterEggOpen(false);
-                  setIsUnlocked(false);
-                  setSecurityAnswer("");
-                  setEasterEggError(false);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/80 border border-red-500/40 text-red-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                title="Close Window"
-              >
-                <X className="w-4 h-4 text-red-300" />
-                <span>Close</span>
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-5">
-              {!isUnlocked ? (
-                <form onSubmit={handleEasterEggUnlock} className="space-y-4">
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    Security verification required to unlock Coordinator Appreciation Certificate generation.
-                  </p>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wide">
-                      Security Question: Type the number to unlock this
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="Enter security number..."
-                      value={securityAnswer}
-                      onChange={(e) => setSecurityAnswer(e.target.value)}
-                      autoFocus
-                      className="w-full px-4 py-2.5 rounded-lg bg-black border border-purple-500/50 text-sm text-white focus:outline-none focus:border-purple-400 font-medium"
-                    />
-                    {easterEggError && (
-                      <p className="text-xs text-red-400 mt-1.5 font-semibold">Incorrect number. Access restricted.</p>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-purple-600/30 transition"
-                  >
-                    Verify Admin Identity
-                  </button>
-                </form>
-              ) : (
-                <div className="space-y-6">
-                  <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-sm font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                      <span>
-                        Identity verified!{" "}
-                        {coordinatorTemplateFileName
-                          ? `Custom template "${coordinatorTemplateFileName}" loaded.`
-                          : "Official CSI SB RSET Coordinator template loaded."}
-                      </span>
-                    </div>
-                    <button
-                      onClick={handleDownloadAllCoordinators}
-                      disabled={isGeneratingCoordinatorCerts || !event.assigned_coordinators.length}
-                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center justify-center gap-2 shrink-0 disabled:opacity-50"
-                    >
-                      {isGeneratingCoordinatorCerts ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
-                      <span>Download All Coordinators ZIP</span>
-                    </button>
-                  </div>
-
-                  {/* Template Upload & Customization Bar */}
-                  <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                          Active Template:
-                        </span>
-                        {coordinatorTemplateFileName ? (
-                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                            Custom: {coordinatorTemplateFileName}
-                          </span>
-                        ) : (
-                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                            Official CSI SB RSET Gold Standard
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-400">
-                        Upload custom certificate template as <span className="text-purple-300 font-semibold">PowerPoint (.pptx)</span>, <span className="text-purple-300 font-semibold">PDF (.pdf)</span>, or <span className="text-purple-300 font-semibold">Image</span>.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <label className="cursor-pointer px-3.5 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-md shadow-purple-600/30">
-                        {isUploadingCoordinatorTemplate ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Upload className="w-3.5 h-3.5" />
-                        )}
-                        <span>{coordinatorTemplateFileName ? "Change Template" : "Upload Template (PPTX / PDF)"}</span>
-                        <input
-                          type="file"
-                          accept=".pptx,.ppt,.pdf,image/png,image/jpeg,image/jpg"
-                          onChange={handleCoordinatorTemplateUpload}
-                          className="hidden"
-                          disabled={isUploadingCoordinatorTemplate}
-                        />
-                      </label>
-
-                      {coordinatorTemplateFileName && (
-                        <button
-                          onClick={handleResetCoordinatorTemplate}
-                          title="Reset to default official template"
-                          className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 border border-slate-600"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Reset Default</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Coordinator selector pills */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-bold text-purple-300 uppercase tracking-wide">
-                        Select Coordinator to Preview:
-                      </label>
-                      <span className="text-xs text-slate-400">
-                        {event.assigned_coordinators.length} assigned
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {event.assigned_coordinators.map((name) => {
-                        const isSelected = (selectedCoordinator || event.assigned_coordinators[0]) === name;
-                        return (
-                          <button
-                            key={name}
-                            onClick={() => setSelectedCoordinator(name)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
-                              isSelected
-                                ? "bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-600/30"
-                                : "bg-black/60 text-slate-300 border-purple-500/30 hover:border-purple-400"
-                            }`}
-                          >
-                            {name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Live Certificate Preview */}
-                  <div className="bg-black/90 rounded-xl border border-purple-500/40 p-4 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-slate-400 border-b border-purple-500/20 pb-2">
-                      <span className="font-semibold text-slate-200">
-                        Live Certificate Preview: <span className="text-amber-400 font-bold">{selectedCoordinator || event.assigned_coordinators[0]}</span>
-                      </span>
-                      <button
-                        onClick={() => handleDownloadSingleCoordinator(selectedCoordinator || event.assigned_coordinators[0])}
-                        disabled={isGeneratingCoordinatorCerts}
-                        className="px-3 py-1 bg-purple-600/40 hover:bg-purple-600 text-purple-200 hover:text-white rounded-md text-xs font-bold transition flex items-center gap-1.5"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download this PDF</span>
-                      </button>
-                    </div>
-
-                    <div className="relative w-full aspect-[1024/725] rounded-lg overflow-hidden bg-white/5 border border-purple-500/20 flex items-center justify-center">
-                      {coordinatorPreviewUrl ? (
-                        <img
-                          src={coordinatorPreviewUrl}
-                          alt="Coordinator Certificate Preview"
-                          className="w-full h-full object-contain"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center gap-2 text-slate-400 text-xs">
-                          <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
-                          <span>Rendering certificate preview...</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Coordinators List with Individual Download Actions */}
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold text-white uppercase tracking-wider">
-                      All Assigned Coordinators ({event.assigned_coordinators.length}):
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
-                      {event.assigned_coordinators.map((name) => (
-                        <div
-                          key={name}
-                          className="p-3 rounded-lg bg-black border border-purple-500/30 flex items-center justify-between gap-2"
-                        >
-                          <span className="text-white text-sm font-semibold truncate">{name}</span>
-                          <button
-                            onClick={() => handleDownloadSingleCoordinator(name)}
-                            disabled={isGeneratingCoordinatorCerts}
-                            className="px-3 py-1.5 rounded-md bg-purple-600/40 hover:bg-purple-600 text-purple-200 hover:text-white text-xs font-bold transition flex items-center gap-1 shrink-0"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>PDF</span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Bottom Footer with prominent Close button when unlocked */}
-            {isUnlocked && (
-              <div className="border-t border-purple-500/30 px-6 py-3.5 bg-[#0E0C17] rounded-b-2xl shrink-0 flex items-center justify-between">
-                <span className="text-xs text-slate-400">
-                  CSI SB RSET Coordinator Studio
-                </span>
-                <button
-                  onClick={() => {
-                    setIsEasterEggOpen(false);
-                    setIsUnlocked(false);
-                    setSecurityAnswer("");
-                    setEasterEggError(false);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 border border-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>Close Studio</span>
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
