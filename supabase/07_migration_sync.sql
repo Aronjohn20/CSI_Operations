@@ -64,3 +64,4 @@ BEGIN
     ALTER TABLE event_coordinators DISABLE ROW LEVEL SECURITY;
   END IF;
 END $$;
+
