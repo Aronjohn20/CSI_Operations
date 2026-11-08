@@ -5,11 +5,11 @@ export async function POST(req: Request) {
     const payload = await req.json();
     const action = payload.action || "";
 
-    // Allow dedicated feedback webhook URL if provided, otherwise fallback to master CSI webhook
-    const webhookUrl =
-      (action.includes("feedback") && process.env.NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL)
-        ? process.env.NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL
-        : (process.env.NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL || process.env.NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL);
+    // Route feedback actions to feedback webhook (or master fallback), and registration actions to master webhook (or feedback fallback)
+    const isFeedbackAction = action.includes("feedback");
+    const webhookUrl = isFeedbackAction
+      ? (process.env.NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL || process.env.NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL)
+      : (process.env.NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL || process.env.NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL);
 
     if (!webhookUrl) {
       return NextResponse.json(
