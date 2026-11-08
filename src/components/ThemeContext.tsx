@@ -12,8 +12,8 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType>({
   theme: "dark",
-  toggleTheme: () => {},
-  setTheme: () => {},
+  toggleTheme: () => { },
+  setTheme: () => { },
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -53,7 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyTheme(t);
     try {
       localStorage.setItem("csi_theme", t);
-    } catch {}
+    } catch { }
   };
 
   const toggleTheme = () => {

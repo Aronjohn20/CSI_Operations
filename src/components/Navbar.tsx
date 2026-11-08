@@ -16,7 +16,7 @@ export default function Navbar() {
   ];
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-60 bg-csi-sidebar border-r border-csi-border flex flex-col z-50 transition-colors duration-200">
+    <aside className="fixed top-0 left-0 h-screen w-60 bg-csi-sidebar border-r border-csi-border flex flex-col z-50 transition-colors duration-200 overflow-y-auto">
       {/* Brand */}
       <div className="px-5 py-6 border-b border-csi-border">
         <div className="flex items-center space-x-3">
