@@ -142,7 +142,7 @@ export async function extractPptxData(file: File): Promise<{
     console.warn("Could not fetch PowerPoint slide preview from API:", err);
   }
 
-  // 2. Fallback: Only extract from ppt/media/ if it represents a full slide background
+  // 2. Fallback: Extract largest background image from ppt/media/
   if (!previewImageBase64) {
     try {
       const zip = await JSZip.loadAsync(buffer);
@@ -150,18 +150,24 @@ export async function extractPptxData(file: File): Promise<{
         (f) => f.startsWith("ppt/media/") && !zip.files[f].dir
       );
 
-      // Only pick if image is significant (e.g. background banner), avoid tiny logos
       let maxLen = 0;
       let candidateData: string | undefined = undefined;
       let candidateExt = "jpeg";
 
       for (const m of mediaFiles) {
-        const data = await zip.files[m].async("base64");
-        // An actual slide background image is generally > 80KB (base64 > 110,000 chars)
-        if (data.length > 100000 && data.length > maxLen) {
-          maxLen = data.length;
-          candidateExt = m.toLowerCase().endsWith(".png") ? "png" : "jpeg";
-          candidateData = data;
+        const lower = m.toLowerCase();
+        if (
+          lower.endsWith(".png") ||
+          lower.endsWith(".jpg") ||
+          lower.endsWith(".jpeg") ||
+          lower.endsWith(".webp")
+        ) {
+          const data = await zip.files[m].async("base64");
+          if (data.length > maxLen) {
+            maxLen = data.length;
+            candidateExt = lower.endsWith(".png") ? "png" : "jpeg";
+            candidateData = data;
+          }
         }
       }
 
