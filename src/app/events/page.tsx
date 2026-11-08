@@ -59,6 +59,16 @@ export default function EventsArchivePage() {
 
   useEffect(() => {
     reloadEvents();
+
+    const handleEvents = (e: any) => {
+      if (e.detail) setEvents(e.detail);
+      else reloadEvents();
+    };
+
+    window.addEventListener("csi_events_updated", handleEvents);
+    return () => {
+      window.removeEventListener("csi_events_updated", handleEvents);
+    };
   }, []);
 
   const handleDelete = (id: string, name: string) => {

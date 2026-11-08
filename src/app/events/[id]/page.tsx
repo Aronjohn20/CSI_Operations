@@ -46,7 +46,7 @@ import {
   FeedbackQuestion,
 } from "@/lib/types";
 import { members } from "@/lib/data";
-import { getStoredEvents, deleteEvent, updateEvent } from "@/lib/eventsStorage";
+import { getStoredEvents, getEventById, deleteEvent, updateEvent } from "@/lib/eventsStorage";
 import {
   generateEventGoogleAppsScript,
   getDepartmentChoices,
@@ -743,11 +743,24 @@ export default function EventContainerPage() {
 
   useEffect(() => {
     if (!eventId) return;
-    const all = getStoredEvents();
-    const found = all.find((e) => e.id === eventId);
-    if (found) {
-      setEvent(found);
-    }
+
+    const loadEvent = () => {
+      const found = getEventById(eventId);
+      if (found) {
+        setEvent(found);
+      }
+    };
+
+    loadEvent();
+
+    const handleEventsUpdated = () => {
+      loadEvent();
+    };
+
+    window.addEventListener("csi_events_updated", handleEventsUpdated);
+    return () => {
+      window.removeEventListener("csi_events_updated", handleEventsUpdated);
+    };
   }, [eventId]);
 
   if (!event) {

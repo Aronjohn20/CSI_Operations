@@ -13,6 +13,23 @@ export default function Home() {
   useEffect(() => {
     setEvents(getStoredEvents());
     setMembers(getStoredMembers());
+
+    const handleEvents = (e: any) => {
+      if (e.detail) setEvents(e.detail);
+      else setEvents(getStoredEvents());
+    };
+    const handleMembers = (e: any) => {
+      if (e.detail) setMembers(e.detail);
+      else setMembers(getStoredMembers());
+    };
+
+    window.addEventListener("csi_events_updated", handleEvents);
+    window.addEventListener("csi_members_updated", handleMembers);
+
+    return () => {
+      window.removeEventListener("csi_events_updated", handleEvents);
+      window.removeEventListener("csi_members_updated", handleMembers);
+    };
   }, []);
 
   const totalMembers = members.length;
