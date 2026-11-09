@@ -309,7 +309,7 @@ export default function CertificatePdfStudioPage() {
       if (activeTab === "appreciation" && (currentWinnerPos === "1st" || currentWinnerPos === "2nd" || currentWinnerPos === "3rd")) {
         // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(475, 598, 145, 44);
+        ctx.fillRect(475, 598, 145, 46);
 
         const num = currentWinnerPos === "1st" ? "1" : currentWinnerPos === "2nd" ? "2" : "3";
         const suffix = currentWinnerPos === "1st" ? "st" : currentWinnerPos === "2nd" ? "nd" : "rd";
@@ -326,7 +326,7 @@ export default function CertificatePdfStudioPage() {
 
         // Superscript ordinal suffix: bold 22px Times New Roman
         ctx.font = 'bold 22px "Times New Roman", serif';
-        ctx.fillText(suffix, startX + numW + 1, 617);
+        ctx.fillText(suffix, startX + numW + 1, 618);
         const suffixW = ctx.measureText(suffix).width;
 
         // Word " place": bold 33px Times New Roman
