@@ -21,22 +21,41 @@ export async function POST(req: Request) {
       );
     }
 
-    // Call Google Apps Script Web App
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      redirect: "follow",
-    });
+    // Call Google Apps Script Web App with automatic retry for cold starts / transient timeouts
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 28000); // 28s timeout
 
-    if (!response.ok) {
-      throw new Error(`Google Apps Script responded with HTTP ${response.status}`);
+        const response = await fetch(webhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+          redirect: "follow",
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`Google Apps Script responded with HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        return NextResponse.json(result);
+      } catch (err: any) {
+        lastError = err;
+        if (attempt === 1) {
+          // Wait 800ms before second attempt if cold start or network glitch
+          await new Promise((res) => setTimeout(res, 800));
+        }
+      }
     }
 
-    const result = await response.json();
-    return NextResponse.json(result);
+    throw lastError || new Error("Failed to communicate with CSI Google Webhook after retrying.");
   } catch (error: any) {
     return NextResponse.json(
       {

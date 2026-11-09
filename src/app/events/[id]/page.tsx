@@ -46,7 +46,8 @@ import {
   FeedbackQuestion,
 } from "@/lib/types";
 import { members } from "@/lib/data";
-import { getStoredEvents, getEventById, deleteEvent, updateEvent } from "@/lib/eventsStorage";
+import { getStoredEvents, getEventById, deleteEvent, updateEvent, syncEventsWithSupabase } from "@/lib/eventsStorage";
+import { supabase } from "@/lib/supabaseClient";
 import {
   generateEventGoogleAppsScript,
   getDepartmentChoices,
@@ -205,14 +206,16 @@ export default function EventContainerPage() {
   };
 
   const handleSyncFinalRosterFromDrive = async () => {
-    if (!event) return;
+    const currentEv = getEventById(eventId) || event;
+    if (!currentEv) return;
     setIsSyncingFromDrive(true);
     setDriveActionNotice(null);
 
     try {
-      let sheetId = event.google_sheet_id;
-      if (!sheetId && event.google_sheet_url) {
-        const match = event.google_sheet_url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      let sheetId = currentEv.google_sheet_id || event?.google_sheet_id;
+      const sheetUrl = currentEv.google_sheet_url || event?.google_sheet_url;
+      if (!sheetId && sheetUrl) {
+        const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (match) sheetId = match[1];
       }
 
@@ -240,7 +243,8 @@ export default function EventContainerPage() {
       }
 
       const updated: CSIEvent = {
-        ...event,
+        ...currentEv,
+        ...(event || {}),
         registered_attendees: attendees,
       };
 
@@ -510,14 +514,16 @@ export default function EventContainerPage() {
   };
 
   const handleSyncFeedbackFromDrive = async () => {
-    if (!event) return;
+    const currentEv = getEventById(eventId) || event;
+    if (!currentEv) return;
     setIsSyncingFeedbackFromDrive(true);
     setFeedbackActionNotice(null);
 
     try {
-      let sheetId = event.feedback_google_sheet_id;
-      if (!sheetId && event.feedback_google_sheet_url) {
-        const match = event.feedback_google_sheet_url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      let sheetId = currentEv.feedback_google_sheet_id || event?.feedback_google_sheet_id;
+      const sheetUrl = currentEv.feedback_google_sheet_url || event?.feedback_google_sheet_url;
+      if (!sheetId && sheetUrl) {
+        const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (match) sheetId = match[1];
       }
 
@@ -545,7 +551,8 @@ export default function EventContainerPage() {
       }
 
       const updated: CSIEvent = {
-        ...event,
+        ...currentEv,
+        ...(event || {}),
         feedback_attendees: attendees,
       };
 
@@ -744,11 +751,67 @@ export default function EventContainerPage() {
   useEffect(() => {
     if (!eventId) return;
 
-    const loadEvent = () => {
-      const found = getEventById(eventId);
+    const loadEvent = async () => {
+      let found = getEventById(eventId);
       if (found) {
         setEvent(found);
+        return;
       }
+
+      // If not present in local storage yet, fetch directly from Supabase
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from("events")
+            .select("*")
+            .eq("id", eventId)
+            .maybeSingle();
+
+          if (data && !error) {
+            const formatted: CSIEvent = {
+              id: data.id,
+              event_name: data.event_name || "Untitled Event",
+              event_date: data.event_date || new Date().toISOString().split("T")[0],
+              time_start: data.time_start || "09:30 AM",
+              time_end: data.time_end || "04:30 PM",
+              mode: (data.mode || "Offline") as "Offline" | "Online",
+              venue: data.venue || "Auditorium",
+              target_branches: data.target_branches || ["CSE", "CSBS", "IT", "AD"],
+              faculty_in_charge: data.faculty_in_charge || "Dr. Tripti C",
+              brief_description: data.brief_description || "",
+              status: (data.status || "confirmed") as "planned" | "confirmed" | "completed",
+              required_coordinators: Number(data.required_coordinators) || 2,
+              assigned_coordinators: Array.isArray(data.assigned_coordinators) ? data.assigned_coordinators : [],
+              google_form_url: data.google_form_url || undefined,
+              google_form_edit_url: data.google_form_edit_url || undefined,
+              google_form_id: data.google_form_id || undefined,
+              google_sheet_url: data.google_sheet_url || undefined,
+              google_sheet_id: data.google_sheet_id || undefined,
+              is_registration_closed: data.is_registration_closed || false,
+              registered_attendees: data.registered_attendees || undefined,
+              feedback_google_form_url: data.feedback_google_form_url || undefined,
+              feedback_google_form_edit_url: data.feedback_google_form_edit_url || undefined,
+              feedback_google_form_id: data.feedback_google_form_id || undefined,
+              feedback_google_sheet_url: data.feedback_google_sheet_url || undefined,
+              feedback_google_sheet_id: data.feedback_google_sheet_id || undefined,
+              is_feedback_closed: data.is_feedback_closed || false,
+              feedback_attendees: data.feedback_attendees || undefined,
+              winners: data.winners || undefined,
+            };
+            setEvent(formatted);
+            updateEvent(formatted);
+            return;
+          }
+        } catch {
+          // Fall through to sync
+        }
+      }
+
+      // Fallback: trigger background sync and recheck
+      syncEventsWithSupabase().then((merged) => {
+        const recheck = merged.find((e) => e.id === eventId);
+        if (recheck) setEvent(recheck);
+      });
     };
 
     loadEvent();
@@ -765,15 +828,33 @@ export default function EventContainerPage() {
 
   if (!event) {
     return (
-      <div className="p-12 text-center space-y-4">
-        <p className="text-slate-400 text-base">Event not found or still loading...</p>
-        <Link
-          href="/events"
-          className="inline-flex items-center gap-2 text-sm font-bold text-purple-400 hover:underline"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Events Archive
-        </Link>
+      <div className="p-16 text-center space-y-5 max-w-md mx-auto">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-400 mx-auto" />
+        <h3 className="text-lg font-bold text-white">Loading Event Details...</h3>
+        <p className="text-slate-400 text-sm">
+          Fetching event configuration from Supabase and local cache.
+        </p>
+        <div className="pt-2 flex items-center justify-center gap-3">
+          <button
+            onClick={() => {
+              syncEventsWithSupabase().then(() => {
+                const f = getEventById(eventId);
+                if (f) setEvent(f);
+              });
+            }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-600/30 text-purple-200 text-xs font-semibold hover:bg-purple-600/50 border border-purple-500/30"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Refresh
+          </button>
+          <Link
+            href="/events"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-purple-400 hover:underline"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to Events Archive
+          </Link>
+        </div>
       </div>
     );
   }
@@ -1054,7 +1135,7 @@ export default function EventContainerPage() {
                       formattedDateFull,
                       timeFormatted,
                       event.venue,
-                      event.brief_description,
+                      event.brief_description || "",
                       branchesString,
                       facultyCoordinator
                     )
@@ -1073,7 +1154,7 @@ export default function EventContainerPage() {
                       formattedDateFull,
                       timeFormatted,
                       event.venue,
-                      event.brief_description,
+                      event.brief_description || "",
                       branchesString,
                       facultyCoordinator
                     )

@@ -69,7 +69,7 @@ export interface CSIEvent {
   venue: string;
   target_branches: string[]; // 9 branches: AEI, CSE, CSBS, IT, AD, ME, CE, EEE, ECE
   faculty_in_charge: string;
-  brief_description: string;
+  brief_description?: string;
   status: "planned" | "confirmed" | "completed";
   required_coordinators: number;
   assigned_coordinators: string[]; // member names

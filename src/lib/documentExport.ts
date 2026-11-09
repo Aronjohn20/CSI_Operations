@@ -501,9 +501,9 @@ export function exportPermissionPdf(
   eventDateFormatted: string,
   timeFormatted: string,
   venue: string,
-  briefDescription: string,
-  targetBranchesString: string,
-  facultyCoordinator: string
+  briefDescription: string = "",
+  targetBranchesString: string = "eligible",
+  facultyCoordinator: string = "Dr. Tripti C (Faculty Coordinator)"
 ) {
   const doc = new jsPDF({
     orientation: "portrait",
@@ -587,9 +587,9 @@ export function exportPermissionWord(
   eventDateFormatted: string,
   timeFormatted: string,
   venue: string,
-  briefDescription: string,
-  targetBranchesString: string,
-  facultyCoordinator: string
+  briefDescription: string = "",
+  targetBranchesString: string = "eligible",
+  facultyCoordinator: string = "Dr. Tripti C (Faculty Coordinator)"
 ) {
   const html = `
     <p style="margin: 0 0 3pt 0;">To</p>

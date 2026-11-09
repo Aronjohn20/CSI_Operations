@@ -382,3 +382,4 @@ The platform uses two tables connected by coordinator name arrays:
 | `member_type` | `TEXT` | `'old_coordinator'` or `'new_coordinator'` |
 | `is_active` | `BOOLEAN` | Active term status (`true` / `false`) |
 | `events_coordinated_count` | `INTEGER` | Real-time count of events coordinated |
+

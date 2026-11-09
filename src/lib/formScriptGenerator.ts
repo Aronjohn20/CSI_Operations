@@ -143,16 +143,58 @@ export function mapGoogleFormResponsesToAttendance(
   headers: string[],
   rows: string[][]
 ): RegisteredAttendee[] {
-  const normHeaders = headers.map((h) => h.replace(/^["']|["']$/g, "").trim().toLowerCase());
+  // Normalize header strings by stripping quotes, asterisks, punctuation, extra spaces, and lowering case
+  const normHeaders = headers.map((h) =>
+    String(h || "")
+      .replace(/[*_#"'`:]/g, "")
+      .trim()
+      .toLowerCase()
+  );
 
-  // Detect index of each question
-  const titleIdx = normHeaders.findIndex((h) => h === "title");
-  const nameIdx = normHeaders.findIndex((h) => h === "name" || h.includes("student name") || h.includes("full name"));
-  const yearIdx = normHeaders.findIndex((h) => h.includes("year of study") || h.includes("year"));
-  const deptIdx = normHeaders.findIndex((h) => h === "department" || h.includes("dept") || h.includes("branch"));
-  const divIdx = normHeaders.findIndex((h) => h === "division" || h.includes("div"));
-  const directClassIdx = normHeaders.findIndex((h) => h.includes("class & batch") || h.includes("class"));
-  const directGenderIdx = normHeaders.findIndex((h) => h.includes("gender") || h.includes("sex"));
+  // Detect index of each question with resilient fuzzy matching
+  const titleIdx = normHeaders.findIndex(
+    (h) => h === "title" || h.includes("title") || h.startsWith("salutation")
+  );
+
+  let nameIdx = normHeaders.findIndex(
+    (h) =>
+      h === "name" ||
+      h.includes("student name") ||
+      h.includes("full name") ||
+      h.includes("participant name") ||
+      h.includes("name of") ||
+      (h.includes("name") && !h.includes("event") && !h.includes("college") && !h.includes("dept") && !h.includes("faculty"))
+  );
+
+  // Resilient fallback if name column wasn't detected by header text
+  if (nameIdx === -1) {
+    if (titleIdx !== -1 && titleIdx + 1 < headers.length) {
+      nameIdx = titleIdx + 1;
+    } else if (normHeaders.length > 2) {
+      // Common standard: [0: Timestamp, 1: Email or Title, 2: Name]
+      nameIdx = 2;
+    } else if (normHeaders.length > 1) {
+      nameIdx = 1;
+    } else if (normHeaders.length === 1) {
+      nameIdx = 0;
+    }
+  }
+
+  const yearIdx = normHeaders.findIndex(
+    (h) => h.includes("year of study") || h.includes("year") || h.includes("sem")
+  );
+  const deptIdx = normHeaders.findIndex(
+    (h) => h.includes("department") || h.includes("dept") || h.includes("branch")
+  );
+  const divIdx = normHeaders.findIndex(
+    (h) => h.includes("division") || h.includes("section") || h.includes("sec") || h.includes("div")
+  );
+  const directClassIdx = normHeaders.findIndex(
+    (h) => h.includes("class & batch") || h.includes("class") || h.includes("batch")
+  );
+  const directGenderIdx = normHeaders.findIndex(
+    (h) => h.includes("gender") || h.includes("sex")
+  );
 
   if (nameIdx === -1) {
     throw new Error("Could not locate the 'Name' column in the uploaded response sheet.");
@@ -160,9 +202,21 @@ export function mapGoogleFormResponsesToAttendance(
 
   const yearShorthand: Record<string, string> = {
     "1st year": "S1/S2",
+    "1st": "S1/S2",
+    "first year": "S1/S2",
+    "1": "S1/S2",
     "2nd year": "S3/S4",
+    "2nd": "S3/S4",
+    "second year": "S3/S4",
+    "2": "S3/S4",
     "3rd year": "S5/S6",
+    "3rd": "S5/S6",
+    "third year": "S5/S6",
+    "3": "S5/S6",
     "4th year": "S7/S8",
+    "4th": "S7/S8",
+    "fourth year": "S7/S8",
+    "4": "S7/S8",
   };
 
   const divisionShorthand: Record<string, string> = {
@@ -170,49 +224,59 @@ export function mapGoogleFormResponsesToAttendance(
     beta: "B",
     gamma: "C",
     delta: "D",
+    a: "A",
+    b: "B",
+    c: "C",
+    d: "D",
     nil: "",
+    none: "",
+    na: "",
+    "-": "",
   };
 
   const attendees: RegisteredAttendee[] = [];
 
   rows.forEach((row) => {
-    const rawName = row[nameIdx] || "";
-    if (!rawName.trim()) return;
+    const rawName = String(row[nameIdx] || "").trim();
+    if (!rawName) return;
 
-    // Determine Gender (from Title: Mr -> Male, Ms -> Female, or direct Gender column)
+    // Determine Gender (from direct Gender column or Title: Mr -> Male, Ms -> Female)
     let gender = "";
     if (directGenderIdx !== -1 && row[directGenderIdx]) {
-      gender = row[directGenderIdx];
+      const g = row[directGenderIdx].trim().toLowerCase();
+      if (g.startsWith("m") && !g.startsWith("f")) gender = "Male";
+      else if (g.startsWith("f")) gender = "Female";
+      else gender = row[directGenderIdx].trim();
     } else if (titleIdx !== -1 && row[titleIdx]) {
       const t = row[titleIdx].trim().toLowerCase();
-      if (t === "mr") gender = "Male";
-      else if (t === "ms") gender = "Female";
+      if (t === "mr" || t === "mr." || t.startsWith("mr")) gender = "Male";
+      else if (t === "ms" || t === "ms." || t === "mrs" || t.startsWith("ms")) gender = "Female";
     }
 
-    // Determine Class (from Year + Department + Division, or direct Class column)
+    // Determine Class & Batch (from Year + Department + Division, or direct Class column)
     let classBatch = "";
     if (directClassIdx !== -1 && row[directClassIdx]) {
-      classBatch = row[directClassIdx];
+      classBatch = row[directClassIdx].trim();
     } else {
-      const dept = deptIdx !== -1 && row[deptIdx] ? row[deptIdx].trim() : "";
+      const rawDept = deptIdx !== -1 && row[deptIdx] ? row[deptIdx].trim() : "";
       const divRaw = divIdx !== -1 && row[divIdx] ? row[divIdx].trim().toLowerCase() : "";
-      const div = divisionShorthand[divRaw] || (divRaw !== "nil" ? divRaw.toUpperCase() : "");
-      const yr = yearIdx !== -1 && row[yearIdx] ? row[yearIdx].trim() : "";
+      const div =
+        divisionShorthand[divRaw] !== undefined
+          ? divisionShorthand[divRaw]
+          : divRaw && !["nil", "none", "na", "-"].includes(divRaw)
+          ? divRaw.toUpperCase()
+          : "";
 
-      if (dept) {
-        if (yr && div) {
-          classBatch = `${yr} ${dept} ${div}`;
-        } else if (dept && div) {
-          classBatch = `${dept} ${div}`;
-        } else {
-          classBatch = dept;
-        }
-      }
+      const yrRaw = yearIdx !== -1 && row[yearIdx] ? row[yearIdx].trim().toLowerCase() : "";
+      const yr = yearShorthand[yrRaw] || (yrRaw ? row[yearIdx].trim() : "");
+
+      const parts = [yr, rawDept, div].filter(Boolean);
+      classBatch = parts.join(" ");
     }
 
     attendees.push({
       sl_no: attendees.length + 1,
-      name: rawName.trim(),
+      name: rawName,
       gender: gender,
       class_batch: classBatch,
     });
