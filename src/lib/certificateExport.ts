@@ -335,56 +335,81 @@ export function replaceWriteupInSlideXml(
   );
 
   // 2. Intelligent dynamic swap of existing event details inside the template text:
-  // A. Event Title in the paragraph: e.g. "titled Retro Rumble" -> "titled <event.event_name>"
-  if (eventName) {
+  // A. Event Title in the paragraph:
+  // Matches "Retro Rumble" across any XML tags:
+  if (eventName && !eventName.toLowerCase().includes("retro rumble")) {
     xml = xml.replace(
-      /(titled\s+)(?:<[^>]+>)*?(?:Retro Rumble|Bug Se Azadi|Traceback|Cache Quest[^,<]*|Coder of the Month[^,<]*|Tech-Jeopardy|Build &amp; Ship[^,<]*|Real or Cake|Say Cheese|Keeping it Reel|History But Wrong|Off the Script)(?:<\/[^>]+>)*?([,.\s])/gi,
-      `$1${eventName}$2`
+      /R(?:<[^>]+>)*?e(?:<[^>]+>)*?t(?:<[^>]+>)*?r(?:<[^>]+>)*?o(?:<[^>]+>|\s)+R(?:<[^>]+>)*?u(?:<[^>]+>)*?m(?:<[^>]+>)*?b(?:<[^>]+>)*?l(?:<[^>]+>)*?e/gi,
+      eventName
     );
+  }
 
-    // If "Retro Rumble" appears as literal text run
-    if (!eventName.toLowerCase().includes("retro rumble")) {
-      xml = xml.replace(
-        /(<a:t[^>]*>(?:(?!<\/a:t>)[\s\S])*?)Retro Rumble((?:(?!<\/a:t>)[\s\S])*?<\/a:t>)/gi,
-        `$1${eventName}$2`
-      );
+  // Also replace any other past event title across XML tags:
+  const pastEvents = [
+    "Bug Se Azadi",
+    "Traceback",
+    "Cache Quest",
+    "Build & Ship AI product",
+    "Real or Cake",
+    "Say Cheese",
+    "Keeping it Reel",
+    "History But Wrong",
+    "Off the Script",
+    "Tech-Jeopardy",
+  ];
+  for (const pe of pastEvents) {
+    if (eventName && pe.toLowerCase() !== eventName.toLowerCase()) {
+      try {
+        const reg = new RegExp(
+          pe
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            .split(/\s+/)
+            .map((w) => w.split("").join("(?:<[^>]+>)*?"))
+            .join("(?:<[^>]+>|\\s)+"),
+          "gi"
+        );
+        xml = xml.replace(reg, eventName);
+      } catch {}
     }
   }
 
-  // B. Event Date in the paragraph: e.g. "held on 16th September 2026" -> "held on <formattedDate>"
+  // B. Event Date in the paragraph:
+  // Matches "16th September 2026" or any date across XML tags:
   if (formattedDate) {
     xml = xml.replace(
-      /(held on\s+)(?:<[^>]+>)*?(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})(?:<\/[^>]+>)*?([,.\s])/gi,
-      `$1${formattedDate}$2`
+      /16(?:<[^>]+>)*?(?:th|st|nd|rd)?(?:<[^>]+>|\s)+S(?:<[^>]+>)*?e(?:<[^>]+>)*?p(?:<[^>]+>)*?t(?:<[^>]+>)*?e(?:<[^>]+>)*?m(?:<[^>]+>)*?b(?:<[^>]+>)*?e(?:<[^>]+>)*?r(?:<[^>]+>|\s)+2(?:<[^>]+>)*?0(?:<[^>]+>)*?2(?:<[^>]+>)*?6/gi,
+      formattedDate
     );
 
-    if (formattedDate !== "16th September 2026") {
-      xml = xml.replace(
-        /(<a:t[^>]*>(?:(?!<\/a:t>)[\s\S])*?)16th September 2026((?:(?!<\/a:t>)[\s\S])*?<\/a:t>)/gi,
-        `$1${formattedDate}$2`
-      );
-    }
+    xml = xml.replace(
+      /\b\d{1,2}(?:<[^>]+>)*?(?:th|st|nd|rd)?(?:<[^>]+>|\s)+(?:January|February|March|April|May|June|July|August|September|October|November|December)(?:<[^>]+>|\s)+\d{4}\b/gi,
+      formattedDate
+    );
   }
 
-  // C. Event Mode in the paragraph: "in the online Intra-College" / "in the offline Intra-College"
+  // C. Event Mode in the paragraph:
   xml = xml.replace(
-    /(in the\s+)(?:online|offline)(\s+Intra-College|\s+technical|\s+event|\s+competition)/gi,
-    `$1${mode}$2`
+    /(online|offline)(?:<[^>]+>|\s)+Intra-College/gi,
+    `${mode} Intra-College`
   );
 
-  // D. Winner vs Participant phrase adaptation:
+  // D. Placement / Position / Participation phrase adaptation:
   if (position === "participant") {
     xml = xml.replace(
-      /has secured\s+(?:1st|2nd|3rd|\d(?:st|nd|rd|th))\s+place\s+in/gi,
+      /has(?:<[^>]+>|\s)+secured(?:<[^>]+>|\s)+(?:1st|2nd|3rd|\d(?:<[^>]+>)*(?:st|nd|rd|th)?)(?:<[^>]+>|\s)+place(?:<[^>]+>|\s)+in/gi,
       "has actively participated in"
     );
     xml = xml.replace(
-      /CERTIFICATE OF APPRECIATION/gi,
+      /CERTIFICATE(?:<[^>]+>|\s)+OF(?:<[^>]+>|\s)+APPRECIATION/gi,
       "CERTIFICATE OF PARTICIPATION"
     );
   } else if (isWinner) {
     xml = xml.replace(
-      /has (?:actively\s+)?participated in/gi,
+      /has(?:<[^>]+>|\s)+secured(?:<[^>]+>|\s)+(?:1st|2nd|3rd|\d(?:<[^>]+>)*(?:st|nd|rd|th)?)(?:<[^>]+>|\s)+place(?:<[^>]+>|\s)+in/gi,
+      `has secured ${position} place in`
+    );
+    xml = xml.replace(
+      /has(?:<[^>]+>|\s)+(?:actively(?:<[^>]+>|\s)+)?participated(?:<[^>]+>|\s)+in/gi,
       `has secured ${position} place in`
     );
   }

@@ -326,6 +326,7 @@ export default function CertificateStudioPage() {
         });
 
         const { pptxBuffer, previewImageBase64, fileName } = await extractPptxData(file);
+        setLiveSlidePreview("");
 
         if (type === "appreciation") {
           setAppreciationPptxFile({ buffer: pptxBuffer, name: fileName });
@@ -462,16 +463,22 @@ export default function CertificateStudioPage() {
     };
   }, [firstPlaceWinners, secondPlaceWinners, thirdPlaceWinners]);
 
-  // Currently Previewed Attendee
+  // Currently Previewed Attendee - defaults to a sample participant if feedback responses aren't imported yet
   const currentPreviewAttendee = useMemo(() => {
-    if (!attendees || attendees.length === 0) return null;
+    if (!attendees || attendees.length === 0) {
+      return {
+        name: "LEYAH MARY THOMAS",
+        uid: "sample_preview",
+        email: "participant@csi.rset.edu",
+      } as FeedbackAttendee;
+    }
     const found = attendees.find(
       (a) => (a.uid && a.uid === selectedPreviewUid) || a.name === selectedPreviewUid
     );
     return found || attendees[0];
   }, [attendees, selectedPreviewUid]);
 
-  // Generate real PowerPoint slide preview when attendee or tab changes
+  // Generate real PowerPoint slide preview with dynamic participant name & event write-up
   useEffect(() => {
     const activePptx = previewTab === "appreciation" ? appreciationPptxFile : participationPptxFile;
     if (!activePptx?.buffer || !currentPreviewAttendee) {
@@ -483,7 +490,10 @@ export default function CertificateStudioPage() {
     const generatePreview = async () => {
       setIsPreviewLoading(true);
       try {
-        const pos = getWinnerPosition(currentPreviewAttendee, winnersObject);
+        const rawPos = getWinnerPosition(currentPreviewAttendee, winnersObject);
+        const pos = previewTab === "appreciation"
+          ? (rawPos === "participant" ? "1st" : rawPos)
+          : "participant";
         const formattedName = formatCertificateName(currentPreviewAttendee.name);
         const customizedPptx = await createPptxWithName(activePptx.buffer, formattedName, pos, event || undefined);
         const b64 = arrayBufferToBase64(customizedPptx);
