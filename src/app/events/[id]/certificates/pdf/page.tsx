@@ -27,6 +27,7 @@ import {
 import {
   formatCertificateName,
   getWinnerPosition,
+  extractPptxData,
 } from "@/lib/certificateExport";
 
 export default function CertificatePdfStudioPage() {
@@ -141,45 +142,98 @@ export default function CertificatePdfStudioPage() {
     return attendees[0] || ({ name: "Aron", uid: "U2303054" } as FeedbackAttendee);
   }, [targetAttendees, attendees, previewAttendeeIndex]);
 
-  // Handle uploading slide template image (PNG / JPG)
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Apply loaded slide template
+  const applyTemplateImage = (result: string) => {
+    if (activeTab === "appreciation") {
+      setAppreciationSlideBg(result);
+    } else {
+      setParticipationSlideBg(result);
+    }
+
+    if (event) {
+      const updated: CSIEvent = {
+        ...event,
+        certificate_templates: {
+          ...(event.certificate_templates || {}),
+          ...(activeTab === "appreciation"
+            ? {
+                appreciation_slide_url: result,
+                appreciation_template_data: result,
+              }
+            : {
+                participation_slide_url: result,
+                participation_template_data: result,
+              }),
+        },
+      };
+      setEvent(updated);
+      updateEvent(updated);
+    }
+
+    setStatusNotice({
+      type: "success",
+      text: `Loaded ${activeTab === "appreciation" ? "Appreciation" : "Participation"} slide template successfully!`,
+    });
+  };
+
+  // Clear loaded template for active tab
+  const handleClearTemplate = () => {
+    if (activeTab === "appreciation") {
+      setAppreciationSlideBg("");
+    } else {
+      setParticipationSlideBg("");
+    }
+
+    if (event) {
+      const updated: CSIEvent = {
+        ...event,
+        certificate_templates: {
+          ...(event.certificate_templates || {}),
+          ...(activeTab === "appreciation"
+            ? {
+                appreciation_slide_url: "",
+                appreciation_template_data: "",
+              }
+            : {
+                participation_slide_url: "",
+                participation_template_data: "",
+              }),
+        },
+      };
+      setEvent(updated);
+      updateEvent(updated);
+    }
+
+    setStatusNotice({
+      type: "success",
+      text: `Cleared ${activeTab === "appreciation" ? "Appreciation" : "Participation"} template. You can now upload a separate slide.`,
+    });
+  };
+
+  // Handle uploading slide template image (PNG / JPG / PPTX)
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      if (activeTab === "appreciation") {
-        setAppreciationSlideBg(result);
-      } else {
-        setParticipationSlideBg(result);
-      }
-
-      // Save to event
-      if (event) {
-        const updated: CSIEvent = {
-          ...event,
-          certificate_templates: {
-            ...(event.certificate_templates || {}),
-            ...(activeTab === "appreciation"
-              ? {
-                  appreciation_slide_url: result,
-                  appreciation_template_data: result,
-                }
-              : {
-                  participation_slide_url: result,
-                  participation_template_data: result,
-                }),
-          },
-        };
-        setEvent(updated);
-        updateEvent(updated);
-      }
-
+    if (file.name.toLowerCase().endsWith(".pptx")) {
       setStatusNotice({
         type: "success",
-        text: `Loaded ${activeTab === "appreciation" ? "Appreciation" : "Participation"} slide template image successfully!`,
+        text: "Extracting high-resolution slide template from PPTX...",
       });
+      try {
+        const { previewImageBase64 } = await extractPptxData(file);
+        if (previewImageBase64) {
+          applyTemplateImage(previewImageBase64);
+          return;
+        }
+      } catch (err) {
+        console.warn("Could not extract slide preview from PPTX:", err);
+      }
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      applyTemplateImage(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -253,14 +307,30 @@ export default function CertificatePdfStudioPage() {
 
       // 5. Dynamic Winner Position (1st, 2nd, 3rd) on Appreciation Certificate
       if (activeTab === "appreciation" && (currentWinnerPos === "1st" || currentWinnerPos === "2nd" || currentWinnerPos === "3rd")) {
+        // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(510, 626, 185, 38);
+        ctx.fillRect(464, 604, 146, 32);
+
+        const num = currentWinnerPos === "1st" ? "1" : currentWinnerPos === "2nd" ? "2" : "3";
+        const suffix = currentWinnerPos === "1st" ? "st" : currentWinnerPos === "2nd" ? "nd" : "rd";
 
         ctx.fillStyle = "#000000";
-        ctx.font = 'bold 30px "Times New Roman", serif';
         ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.fillText(`${currentWinnerPos} place`, 514, 645);
+        ctx.textBaseline = "alphabetic";
+
+        // Main number: bold 28px Times New Roman
+        ctx.font = 'bold 28px "Times New Roman", serif';
+        ctx.fillText(num, 466, 630);
+        const numW = ctx.measureText(num).width;
+
+        // Superscript ordinal suffix: bold 19px Times New Roman
+        ctx.font = 'bold 19px "Times New Roman", serif';
+        ctx.fillText(suffix, 466 + numW, 619);
+        const suffixW = ctx.measureText(suffix).width;
+
+        // Word " place": bold 28px Times New Roman
+        ctx.font = 'bold 28px "Times New Roman", serif';
+        ctx.fillText(" place", 466 + numW + suffixW, 630);
       }
     };
 
@@ -334,14 +404,30 @@ export default function CertificatePdfStudioPage() {
 
         // 3. Dynamic Winner Position (1st, 2nd, 3rd) on Appreciation Certificate
         if (position === "1st" || position === "2nd" || position === "3rd") {
+          // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
           ctx.fillStyle = "#ffffff";
-          ctx.fillRect(510, 626, 185, 38);
+          ctx.fillRect(464, 604, 146, 32);
+
+          const num = position === "1st" ? "1" : position === "2nd" ? "2" : "3";
+          const suffix = position === "1st" ? "st" : position === "2nd" ? "nd" : "rd";
 
           ctx.fillStyle = "#000000";
-          ctx.font = 'bold 30px "Times New Roman", serif';
           ctx.textAlign = "left";
-          ctx.textBaseline = "middle";
-          ctx.fillText(`${position} place`, 514, 645);
+          ctx.textBaseline = "alphabetic";
+
+          // Main number: bold 28px Times New Roman
+          ctx.font = 'bold 28px "Times New Roman", serif';
+          ctx.fillText(num, 466, 630);
+          const numW = ctx.measureText(num).width;
+
+          // Superscript ordinal suffix: bold 19px Times New Roman
+          ctx.font = 'bold 19px "Times New Roman", serif';
+          ctx.fillText(suffix, 466 + numW, 619);
+          const suffixW = ctx.measureText(suffix).width;
+
+          // Word " place": bold 28px Times New Roman
+          ctx.font = 'bold 28px "Times New Roman", serif';
+          ctx.fillText(" place", 466 + numW + suffixW, 630);
         }
 
         resolve(canvas.toDataURL("image/jpeg", 0.96));
@@ -635,28 +721,47 @@ export default function CertificatePdfStudioPage() {
                     : "Participation Template"}
                 </span>
               </h3>
-              {activeTemplateBg && (
-                <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Loaded
+              {activeTemplateBg ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Loaded
+                  </span>
+                  <button
+                    onClick={handleClearTemplate}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 underline font-medium ml-1"
+                    title="Clear template for this tab"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[11px] font-medium text-amber-400/80">
+                  No template
                 </span>
               )}
             </div>
 
+            {activeTab === "participation" && participationSlideBg && participationSlideBg === appreciationSlideBg && (
+              <p className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-500/30 rounded-lg p-2.5 leading-relaxed">
+                Notice: Participation is currently borrowing the Appreciation slide image. Click <strong>Clear</strong> or upload a separate Participation slide image/PPTX below.
+              </p>
+            )}
+
             <p className="text-xs text-slate-400 leading-relaxed">
               {activeTab === "appreciation"
-                ? "Upload the slide image for Appreciation Certificates. 1st, 2nd, and 3rd place positions and names are dynamically customized for each winner."
-                : "Upload the slide image for Participation Certificates. Each participant's name is dynamically stamped."}
+                ? "Upload the slide image or PPTX for Appreciation Certificates. 1st, 2nd, and 3rd place positions and names are dynamically customized for each winner."
+                : "Upload the slide image or PPTX for Participation Certificates. Each participant's name is dynamically stamped."}
             </p>
 
             <label className="flex items-center justify-center gap-2 p-3.5 rounded-xl border border-dashed border-purple-500/50 hover:border-purple-400 bg-black/40 text-purple-200 text-xs font-bold cursor-pointer transition">
               <Upload className="w-4 h-4 text-purple-400" />
               <span>
-                Upload {activeTab === "appreciation" ? "Appreciation" : "Participation"} Slide Image (.png / .jpg)
+                Upload {activeTab === "appreciation" ? "Appreciation" : "Participation"} Slide (.png / .jpg / .pptx)
               </span>
               <input
                 type="file"
-                accept="image/png, image/jpeg, image/webp"
+                accept="image/png, image/jpeg, image/webp, .pptx, application/vnd.openxmlformats-officedocument.presentationml.presentation"
                 className="hidden"
                 onChange={handleImageUpload}
               />
