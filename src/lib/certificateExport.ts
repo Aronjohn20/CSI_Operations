@@ -211,26 +211,28 @@ export function replacePositionInSlideXml(
   const num = position === "1st" ? "1" : position === "2nd" ? "2" : "3";
   const suffix = position === "1st" ? "st" : position === "2nd" ? "nd" : "rd";
 
-  // 1. Explicit placeholder tokens
+  // 1. Explicit placeholder tokens (explicitly bolded in OpenXML)
   xml = xml.replace(
     /(<<position>>|&lt;&lt;position&gt;&gt;|<position>|&lt;position&gt;|\{\{position\}\}|\{position\}|\[position\])/gi,
-    `${ordinal} place`
+    `</a:t></a:r><a:r><a:rPr b="1"/><a:t>${ordinal} place</a:t></a:r><a:r><a:t>`
   );
   xml = xml.replace(
     /(<<place>>|&lt;&lt;place&gt;&gt;|<place>|&lt;place&gt;|\{\{place\}\}|\{place\}|\[place\])/gi,
-    `${ordinal} place`
+    `</a:t></a:r><a:r><a:rPr b="1"/><a:t>${ordinal} place</a:t></a:r><a:r><a:t>`
   );
   xml = xml.replace(
     /(<<rank>>|&lt;&lt;rank&gt;&gt;|<rank>|&lt;rank&gt;|\{\{rank\}\}|\{rank\}|\[rank\])/gi,
-    `${ordinal} rank`
+    `</a:t></a:r><a:r><a:rPr b="1"/><a:t>${ordinal} rank</a:t></a:r><a:r><a:t>`
   );
 
-  // 2. Full phrase in a single text run: "3rd place", "2nd place", "1st place", "First Place", etc.
-  xml = xml.replace(/\b(1st|2nd|3rd)\s+(place|prize|rank)\b/gi, `${ordinal} $2`);
+  // 2. Full phrase: "3rd place", "2nd place", "1st place", etc. (explicitly bolded)
+  xml = xml.replace(/\b(1st|2nd|3rd)\s+(place|prize|rank)\b/gi, (match, p1, p2) => {
+    return `</a:t></a:r><a:r><a:rPr b="1"/><a:t>${ordinal} ${p2}</a:t></a:r><a:r><a:t>`;
+  });
   xml = xml.replace(/\b(first|second|third)\s+(place|prize|rank)\b/gi, (match, p1, p2) => {
     const isCapital = p1[0] === p1[0].toUpperCase();
     const repWord = isCapital ? Word : word;
-    return `${repWord} ${p2}`;
+    return `</a:t></a:r><a:r><a:rPr b="1"/><a:t>${repWord} ${p2}</a:t></a:r><a:r><a:t>`;
   });
 
   // 3. Standalone ordinal in single run (e.g. "secured 3rd in the online...", "won 2nd"):
@@ -406,11 +408,11 @@ export function replaceWriteupInSlideXml(
   } else if (isWinner) {
     xml = xml.replace(
       /has(?:<[^>]+>|\s)+secured(?:<[^>]+>|\s)+(?:1st|2nd|3rd|\d(?:<[^>]+>)*(?:st|nd|rd|th)?)(?:<[^>]+>|\s)+place(?:<[^>]+>|\s)+in/gi,
-      `has secured ${position} place in`
+      `has secured </a:t></a:r><a:r><a:rPr b="1"/><a:t>${position} place</a:t></a:r><a:r><a:t> in`
     );
     xml = xml.replace(
       /has(?:<[^>]+>|\s)+(?:actively(?:<[^>]+>|\s)+)?participated(?:<[^>]+>|\s)+in/gi,
-      `has secured ${position} place in`
+      `has secured </a:t></a:r><a:r><a:rPr b="1"/><a:t>${position} place</a:t></a:r><a:r><a:t> in`
     );
   }
 

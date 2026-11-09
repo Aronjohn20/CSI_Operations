@@ -28,6 +28,7 @@ import {
   exportCertificatesZip,
   getWinnerPosition,
   formatCertificateName,
+  formatDayFirstOrdinalDate,
   extractPptxData,
   createPptxWithName,
   arrayBufferToBase64,
@@ -1248,9 +1249,16 @@ export default function CertificateStudioPage() {
                       ? formatCertificateName(currentPreviewAttendee.name)
                       : "PARTICIPANT NAME"}
                   </h1>
-                  <p className="text-slate-800 text-xs max-w-xl mx-auto pt-1">
-                    for outstanding contribution and participation in &quot;{event.event_name}&quot;
-                    organized by the Computer Society of India (CSI) Student Branch, RSET.
+                  <p className="text-slate-800 text-xs max-w-xl mx-auto pt-1 leading-relaxed">
+                    {previewTab === "appreciation" ? (
+                      <>
+                        has secured <strong className="font-extrabold text-black">1st place</strong> in the {event.mode?.toLowerCase() || "offline"} event titled <strong className="font-extrabold text-black">&quot;{event.event_name}&quot;</strong> held on <strong className="font-extrabold text-black">{formatDayFirstOrdinalDate(event.event_date)}</strong>, organized by the Computer Society of India (CSI) Student Branch, RSET.
+                      </>
+                    ) : (
+                      <>
+                        has actively participated in the {event.mode?.toLowerCase() || "offline"} event titled <strong className="font-extrabold text-black">&quot;{event.event_name}&quot;</strong> held on <strong className="font-extrabold text-black">{formatDayFirstOrdinalDate(event.event_date)}</strong>, organized by the Computer Society of India (CSI) Student Branch, RSET.
+                      </>
+                    )}
                   </p>
                 </div>
 
