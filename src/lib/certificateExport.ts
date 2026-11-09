@@ -419,6 +419,171 @@ export function replaceWriteupInSlideXml(
   return xml;
 }
 
+function renderRichTextCentered(
+  doc: jsPDF,
+  segments: { text: string; bold?: boolean }[],
+  centerX: number,
+  startY: number,
+  maxWidth: number,
+  fontSize: number,
+  lineHeightMm: number
+) {
+  doc.setFontSize(fontSize);
+
+  interface WordItem {
+    word: string;
+    bold: boolean;
+    width: number;
+  }
+  const words: WordItem[] = [];
+
+  for (const seg of segments) {
+    const rawWords = seg.text.split(" ");
+    for (let i = 0; i < rawWords.length; i++) {
+      const w = rawWords[i];
+      if (w.length === 0) continue;
+      doc.setFont("times", seg.bold ? "bold" : "normal");
+      words.push({
+        word: w,
+        bold: !!seg.bold,
+        width: doc.getTextWidth(w),
+      });
+    }
+  }
+
+  doc.setFont("times", "normal");
+  const spaceWidth = doc.getTextWidth(" ");
+
+  const lines: WordItem[][] = [];
+  let curLine: WordItem[] = [];
+  let curLineWidth = 0;
+
+  for (const item of words) {
+    const needed = curLine.length === 0 ? item.width : curLineWidth + spaceWidth + item.width;
+    if (needed > maxWidth && curLine.length > 0) {
+      lines.push(curLine);
+      curLine = [item];
+      curLineWidth = item.width;
+    } else {
+      curLine.push(item);
+      curLineWidth = needed;
+    }
+  }
+  if (curLine.length > 0) {
+    lines.push(curLine);
+  }
+
+  let y = startY;
+  for (const line of lines) {
+    let totalW = 0;
+    for (let i = 0; i < line.length; i++) {
+      totalW += line[i].width + (i < line.length - 1 ? spaceWidth : 0);
+    }
+    let curX = centerX - totalW / 2;
+
+    for (let i = 0; i < line.length; i++) {
+      const item = line[i];
+      doc.setFont("times", item.bold ? "bold" : "normal");
+      doc.text(item.word, curX, y);
+      curX += item.width + spaceWidth;
+    }
+    y += lineHeightMm;
+  }
+}
+
+/**
+ * Creates a single multi-slide PPTX presentation containing all attendees
+ * Duplicating slide 1 for each attendee in memory using JSZip (100% client-side)
+ */
+export async function createMultiSlidePptx(
+  templateBuffer: ArrayBuffer,
+  attendees: FeedbackAttendee[],
+  eventName: string,
+  eventDate: string,
+  venue: string,
+  winners?: {
+    first_place?: string | string[];
+    second_place?: string | string[];
+    third_place?: string | string[];
+  }
+): Promise<ArrayBuffer> {
+  const zip = await JSZip.loadAsync(templateBuffer);
+
+  const slide1Xml = await zip.file("ppt/slides/slide1.xml")?.async("text");
+  if (!slide1Xml) {
+    return templateBuffer;
+  }
+  const slide1Rels = (await zip.file("ppt/slides/_rels/slide1.xml.rels")?.async("text")) || "";
+  let contentTypesXml = (await zip.file("[Content_Types].xml")?.async("text")) || "";
+  let presXml = (await zip.file("ppt/presentation.xml")?.async("text")) || "";
+  let presRelsXml = (await zip.file("ppt/_rels/presentation.xml.rels")?.async("text")) || "";
+
+  for (let i = 0; i < attendees.length; i++) {
+    const att = attendees[i];
+    const pos = getWinnerPosition(att, winners);
+    const formattedName = formatCertificateName(att.name);
+    const slideNum = i + 1;
+
+    let customizedXml = slide1Xml;
+    customizedXml = customizedXml.replace(
+      /(<<name>>|&lt;&lt;name&gt;&gt;|<name>|&lt;name&gt;|\{\{name\}\}|\{name\}|\[name\])/gi,
+      formattedName
+    );
+    customizedXml = customizedXml.replace(
+      /\b(Participant\s+Name|Student\s+Name|Candidate\s+Name|Full\s+Name)\b/gi,
+      formattedName
+    );
+    const splitRegex = /(&lt;&lt;|<<)(?:(?!&gt;&gt;|>>)(?:[\s\S]))*?name(?:(?!&gt;&gt;|>>)(?:[\s\S]))*?(&gt;&gt;|>>)/gi;
+    if (splitRegex.test(customizedXml)) {
+      customizedXml = customizedXml.replace(splitRegex, formattedName);
+    }
+    customizedXml = replacePositionInSlideXml(customizedXml, pos);
+    customizedXml = replaceWriteupInSlideXml(
+      customizedXml,
+      {
+        event_name: eventName,
+        event_date: eventDate,
+        venue: venue,
+        mode: venue.toLowerCase().includes("online") ? "Online" : "Offline",
+      },
+      pos
+    );
+
+    if (slideNum === 1) {
+      zip.file("ppt/slides/slide1.xml", customizedXml);
+    } else {
+      const slidePath = `ppt/slides/slide${slideNum}.xml`;
+      const relsPath = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
+      zip.file(slidePath, customizedXml);
+      if (slide1Rels) {
+        zip.file(relsPath, slide1Rels);
+      }
+
+      const ctEntry = `<Override PartName="/ppt/slides/slide${slideNum}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`;
+      if (!contentTypesXml.includes(`PartName="/ppt/slides/slide${slideNum}.xml"`)) {
+        contentTypesXml = contentTypesXml.replace("</Types>", `${ctEntry}</Types>`);
+      }
+
+      const relId = `rIdSlide${slideNum}`;
+      const relEntry = `<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${slideNum}.xml"/>`;
+      if (!presRelsXml.includes(`Target="slides/slide${slideNum}.xml"`)) {
+        presRelsXml = presRelsXml.replace("</Relationships>", `${relEntry}</Relationships>`);
+      }
+
+      const sldIdEntry = `<p:sldId id="${256 + i}" r:id="${relId}"/>`;
+      if (presXml.includes("</p:sldIdLst>")) {
+        presXml = presXml.replace("</p:sldIdLst>", `${sldIdEntry}</p:sldIdLst>`);
+      }
+    }
+  }
+
+  zip.file("[Content_Types].xml", contentTypesXml);
+  zip.file("ppt/presentation.xml", presXml);
+  zip.file("ppt/_rels/presentation.xml.rels", presRelsXml);
+
+  return await zip.generateAsync({ type: "arraybuffer" });
+}
+
 /**
  * Creates a customized PPTX file by replacing <<name>>, position, and event writeup in slide XMLs
  * Matches the exact Python python-pptx behavior!
@@ -491,7 +656,7 @@ export function renderCertificatePage(
   const formattedName = formatCertificateName(info.attendee.name);
 
   // If a custom template background image is uploaded, render it full-bleed
-  // and stamp the dynamic formatted name onto it!
+  // and stamp the dynamic formatted name & event write-up onto it!
   if (info.templateImage) {
     try {
       doc.addImage(info.templateImage, "PNG", 0, 0, pageWidth, pageHeight);
@@ -503,11 +668,48 @@ export function renderCertificatePage(
       }
     }
 
-    // Dynamic replacement of <<name>> on the template:
-    doc.setFont("times", "bold");
-    doc.setFontSize(26);
+    // Cover the middle placeholder region (Name line + Writeup line) with clean background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(38, 98, 221, 54, "F");
+
+    // 1. Participant Name:
+    doc.setFont("times", "bolditalic");
+    doc.setFontSize(27);
     doc.setTextColor(20, 20, 30);
     doc.text(formattedName, pageWidth / 2, 112, { align: "center" });
+
+    // Decorative underline under name
+    doc.setDrawColor(217, 119, 6); // Warm Gold
+    doc.setLineWidth(0.4);
+    const nameWidth = Math.min(doc.getTextWidth(formattedName) + 16, 120);
+    doc.line(pageWidth / 2 - nameWidth / 2, 115, pageWidth / 2 + nameWidth / 2, 115);
+
+    // 2. Dynamic Paragraph with bold placement and event name:
+    const formattedDate = formatDayFirstOrdinalDate(info.eventDate);
+    const modeStr = (info.venue?.toLowerCase().includes("online") ? "online" : "offline");
+    const pos = isWinner ? (info.position || "1st") : "participant";
+
+    const segments: { text: string; bold?: boolean }[] = isWinner
+      ? [
+          { text: "has secured " },
+          { text: `${pos} place`, bold: true },
+          { text: ` in the ${modeStr} Intra-College technical event titled ` },
+          { text: info.eventName, bold: true },
+          {
+            text: `, held on ${formattedDate}, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.`,
+          },
+        ]
+      : [
+          { text: `has actively participated in the ${modeStr} Intra-College technical event titled ` },
+          { text: info.eventName, bold: true },
+          {
+            text: `, held on ${formattedDate}, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.`,
+          },
+        ];
+
+    doc.setTextColor(30, 30, 40);
+    renderRichTextCentered(doc, segments, pageWidth / 2, 124, 195, 10.5, 5.2);
+
     return;
   }
 
@@ -757,6 +959,51 @@ export function exportBatchCertificatesPdf(
 
   const cleanEvent = eventName.replace(/[^a-zA-Z0-9_-]/g, "_");
   doc.save(`All_Certificates_${cleanEvent}.pdf`);
+}
+
+/**
+ * Compiles a batch of certificates into a vector PDF Blob directly in the browser
+ * (runs 100% client-side, zero serverless / Linux dependencies, works identically on Vercel)
+ */
+export function generateBatchCertificatesBlob(
+  attendees: FeedbackAttendee[],
+  eventName: string,
+  eventDate: string,
+  venue: string,
+  winners?: {
+    first_place?: string | string[];
+    second_place?: string | string[];
+    third_place?: string | string[];
+  },
+  templateImage?: string,
+  facultyCoordinator?: string
+): Blob {
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4",
+  });
+
+  attendees.forEach((att, idx) => {
+    const position = getWinnerPosition(att, winners);
+
+    renderCertificatePage(
+      doc,
+      {
+        attendee: att,
+        eventName,
+        eventDate,
+        venue,
+        position,
+        facultyCoordinator,
+        templateImage,
+      },
+      idx,
+      attendees.length
+    );
+  });
+
+  return doc.output("blob");
 }
 
 /**

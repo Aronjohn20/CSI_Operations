@@ -21,9 +21,15 @@ import {
   Link2,
   Clipboard,
   ShieldCheck,
+  Cloud,
 } from "lucide-react";
 import { CSIEvent, FeedbackAttendee } from "@/lib/types";
-import { getEventById, updateEvent, uploadCertificateTemplateToSupabase } from "@/lib/eventsStorage";
+import {
+  getEventById,
+  updateEvent,
+  uploadCertificateTemplateToSupabase,
+  uploadGeneratedCertificatesToSupabase,
+} from "@/lib/eventsStorage";
 import {
   exportCertificatesZip,
   getWinnerPosition,
@@ -31,8 +37,10 @@ import {
   formatDayFirstOrdinalDate,
   extractPptxData,
   createPptxWithName,
+  createMultiSlidePptx,
   arrayBufferToBase64,
   base64ToUint8Array,
+  generateBatchCertificatesBlob,
 } from "@/lib/certificateExport";
 import {
   mapGoogleSheetToFeedbackAttendees,
@@ -91,6 +99,7 @@ export default function CertificateStudioPage() {
   // Export Loading States
   const [isExportingWinnersZip, setIsExportingWinnersZip] = useState(false);
   const [isExportingParticipationZip, setIsExportingParticipationZip] = useState(false);
+  const [isCompilingToCloud, setIsCompilingToCloud] = useState(false);
 
   // Load event
   useEffect(() => {
@@ -692,7 +701,7 @@ export default function CertificateStudioPage() {
     }
   };
 
-  // Export 1: Winners Appreciation ZIP
+  // Export 1: Winners Appreciation ZIP + Automatic Cloud Vector PDF Backup
   const handleDownloadWinnersZip = async () => {
     if (!event) return;
     setIsExportingWinnersZip(true);
@@ -710,9 +719,70 @@ export default function CertificateStudioPage() {
         appreciationPptxFile?.buffer,
         event.faculty_in_charge
       );
+
+      // Background compilation and upload to Supabase Storage Bucket for team-wide access
+      const winnersAttendees = attendees.filter((att) => {
+        const pos = getWinnerPosition(att, winnersObject);
+        return pos === "1st" || pos === "2nd" || pos === "3rd";
+      });
+
+      if (winnersAttendees.length > 0) {
+        try {
+          const pdfBlob = generateBatchCertificatesBlob(
+            winnersAttendees,
+            event.event_name,
+            event.event_date,
+            event.venue,
+            winnersObject,
+            appreciationTemplate || undefined,
+            event.faculty_in_charge
+          );
+          const pdfUrl = await uploadGeneratedCertificatesToSupabase(pdfBlob, event.id, "winners", "pdf");
+
+          let pptxUrl: string | null = null;
+          if (appreciationPptxFile?.buffer) {
+            const pptxBuf = await createMultiSlidePptx(
+              appreciationPptxFile.buffer,
+              winnersAttendees,
+              event.event_name,
+              event.event_date,
+              event.venue,
+              winnersObject
+            );
+            pptxUrl = await uploadGeneratedCertificatesToSupabase(
+              new Blob([pptxBuf], {
+                type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              }),
+              event.id,
+              "winners",
+              "pptx"
+            );
+          }
+
+          if (pdfUrl) {
+            saveEventChanges(
+              firstPlaceWinners,
+              secondPlaceWinners,
+              thirdPlaceWinners,
+              appreciationTemplate,
+              participationTemplate,
+              attendees,
+              {
+                winners_pdf_url: pdfUrl,
+                winners_pdf_count: winnersAttendees.length,
+                ...(pptxUrl ? { winners_pptx_url: pptxUrl } : {}),
+                last_generated_at: new Date().toISOString(),
+              }
+            );
+          }
+        } catch (uploadErr) {
+          console.warn("Background upload of winners batch PDF failed:", uploadErr);
+        }
+      }
+
       setStatusNotice({
         type: "success",
-        text: `Downloaded ${count} winner certificate(s) in "Winners_Appreciation_Certificates_${event.event_name}.zip"!`,
+        text: `Downloaded ${count} winner certificate(s) & saved to Supabase Storage! All associates can now access them.`,
       });
     } catch (err: any) {
       setStatusNotice({
@@ -724,7 +794,7 @@ export default function CertificateStudioPage() {
     }
   };
 
-  // Export 2: Participation ZIP
+  // Export 2: Participation ZIP + Automatic Cloud Vector PDF Backup
   const handleDownloadParticipationZip = async () => {
     if (!event) return;
     setIsExportingParticipationZip(true);
@@ -742,9 +812,70 @@ export default function CertificateStudioPage() {
         participationPptxFile?.buffer,
         event.faculty_in_charge
       );
+
+      // Background compilation and upload to Supabase Storage Bucket for team-wide access
+      const partAttendees = attendees.filter((att) => {
+        const pos = getWinnerPosition(att, winnersObject);
+        return pos === "participant";
+      });
+
+      if (partAttendees.length > 0) {
+        try {
+          const pdfBlob = generateBatchCertificatesBlob(
+            partAttendees,
+            event.event_name,
+            event.event_date,
+            event.venue,
+            winnersObject,
+            participationTemplate || undefined,
+            event.faculty_in_charge
+          );
+          const pdfUrl = await uploadGeneratedCertificatesToSupabase(pdfBlob, event.id, "participation", "pdf");
+
+          let pptxUrl: string | null = null;
+          if (participationPptxFile?.buffer) {
+            const pptxBuf = await createMultiSlidePptx(
+              participationPptxFile.buffer,
+              partAttendees,
+              event.event_name,
+              event.event_date,
+              event.venue,
+              winnersObject
+            );
+            pptxUrl = await uploadGeneratedCertificatesToSupabase(
+              new Blob([pptxBuf], {
+                type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              }),
+              event.id,
+              "participation",
+              "pptx"
+            );
+          }
+
+          if (pdfUrl) {
+            saveEventChanges(
+              firstPlaceWinners,
+              secondPlaceWinners,
+              thirdPlaceWinners,
+              appreciationTemplate,
+              participationTemplate,
+              attendees,
+              {
+                participation_pdf_url: pdfUrl,
+                participation_pdf_count: partAttendees.length,
+                ...(pptxUrl ? { participation_master_pptx_url: pptxUrl } : {}),
+                last_generated_at: new Date().toISOString(),
+              }
+            );
+          }
+        } catch (uploadErr) {
+          console.warn("Background upload of participation batch PDF failed:", uploadErr);
+        }
+      }
+
       setStatusNotice({
         type: "success",
-        text: `Downloaded ${count} participation certificate(s) in "Participation_Certificates_${event.event_name}.zip"!`,
+        text: `Downloaded ${count} participation certificate(s) & saved to Supabase Storage! All associates can now access them.`,
       });
     } catch (err: any) {
       setStatusNotice({
@@ -753,6 +884,124 @@ export default function CertificateStudioPage() {
       });
     } finally {
       setIsExportingParticipationZip(false);
+    }
+  };
+
+  // Compile & Save All Certificates Directly to Cloud (without local ZIP download)
+  const handleCompileAllToCloud = async () => {
+    if (!event || attendees.length === 0) return;
+    setIsCompilingToCloud(true);
+    setStatusNotice(null);
+
+    try {
+      const winnersAttendees = attendees.filter((att) => {
+        const pos = getWinnerPosition(att, winnersObject);
+        return pos === "1st" || pos === "2nd" || pos === "3rd";
+      });
+      const partAttendees = attendees.filter((att) => {
+        const pos = getWinnerPosition(att, winnersObject);
+        return pos === "participant";
+      });
+
+      const extraUpdates: Partial<CSIEvent["certificate_templates"]> = {
+        last_generated_at: new Date().toISOString(),
+      };
+
+      if (winnersAttendees.length > 0) {
+        const winBlob = generateBatchCertificatesBlob(
+          winnersAttendees,
+          event.event_name,
+          event.event_date,
+          event.venue,
+          winnersObject,
+          appreciationTemplate || undefined,
+          event.faculty_in_charge
+        );
+        const winUrl = await uploadGeneratedCertificatesToSupabase(winBlob, event.id, "winners", "pdf");
+        if (winUrl) {
+          extraUpdates.winners_pdf_url = winUrl;
+          extraUpdates.winners_pdf_count = winnersAttendees.length;
+        }
+
+        if (appreciationPptxFile?.buffer) {
+          const winPptx = await createMultiSlidePptx(
+            appreciationPptxFile.buffer,
+            winnersAttendees,
+            event.event_name,
+            event.event_date,
+            event.venue,
+            winnersObject
+          );
+          const winPptxUrl = await uploadGeneratedCertificatesToSupabase(
+            new Blob([winPptx], {
+              type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            }),
+            event.id,
+            "winners",
+            "pptx"
+          );
+          if (winPptxUrl) extraUpdates.winners_pptx_url = winPptxUrl;
+        }
+      }
+
+      if (partAttendees.length > 0) {
+        const partBlob = generateBatchCertificatesBlob(
+          partAttendees,
+          event.event_name,
+          event.event_date,
+          event.venue,
+          winnersObject,
+          participationTemplate || undefined,
+          event.faculty_in_charge
+        );
+        const partUrl = await uploadGeneratedCertificatesToSupabase(partBlob, event.id, "participation", "pdf");
+        if (partUrl) {
+          extraUpdates.participation_pdf_url = partUrl;
+          extraUpdates.participation_pdf_count = partAttendees.length;
+        }
+
+        if (participationPptxFile?.buffer) {
+          const partPptx = await createMultiSlidePptx(
+            participationPptxFile.buffer,
+            partAttendees,
+            event.event_name,
+            event.event_date,
+            event.venue,
+            winnersObject
+          );
+          const partPptxUrl = await uploadGeneratedCertificatesToSupabase(
+            new Blob([partPptx], {
+              type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            }),
+            event.id,
+            "participation",
+            "pptx"
+          );
+          if (partPptxUrl) extraUpdates.participation_master_pptx_url = partPptxUrl;
+        }
+      }
+
+      saveEventChanges(
+        firstPlaceWinners,
+        secondPlaceWinners,
+        thirdPlaceWinners,
+        appreciationTemplate,
+        participationTemplate,
+        attendees,
+        extraUpdates
+      );
+
+      setStatusNotice({
+        type: "success",
+        text: `Compiled and saved all certificates directly to Supabase Storage! All associates can now download them from any device.`,
+      });
+    } catch (err: any) {
+      setStatusNotice({
+        type: "error",
+        text: err.message || "Failed to compile certificates to cloud.",
+      });
+    } finally {
+      setIsCompilingToCloud(false);
     }
   };
 
@@ -919,6 +1168,144 @@ export default function CertificateStudioPage() {
           </div>
           <Download className="w-5 h-5 text-cyan-200" />
         </button>
+      </div>
+
+      {/* CLOUD CERTIFICATES ARCHIVE (SHARED WITH ALL ASSOCIATES) */}
+      <div className="bg-gradient-to-br from-[#131126] to-[#1c1433] rounded-2xl border border-purple-500/30 p-5 shadow-2xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/20 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+              <Cloud className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-white">
+                  Team Cloud Certificates
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Supabase Storage
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Permanently accessible to all associates and coordinators on localhost & Vercel.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleCompileAllToCloud}
+            disabled={isCompilingToCloud || attendees.length === 0}
+            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-2 transition shadow-lg shadow-purple-600/30 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            title="Generate batch vector PDFs and save directly to Supabase bucket"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isCompilingToCloud ? "animate-spin" : ""}`} />
+            <span>{isCompilingToCloud ? "Compiling & Uploading..." : "Compile & Save to Cloud"}</span>
+          </button>
+        </div>
+
+        {/* Cloud Files Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* Winners Cloud File */}
+          <div className="bg-black/40 rounded-xl p-4 border border-amber-500/30 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-amber-200 truncate">
+                  Winners Batch Certificate
+                </div>
+                <div className="text-xs text-slate-400">
+                  {event.certificate_templates?.winners_pdf_url ? (
+                    <span className="text-emerald-400 font-medium">
+                      ✓ Ready ({event.certificate_templates.winners_pdf_count || totalWinnersCount} awardees)
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 italic">Not yet compiled to cloud</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {event.certificate_templates?.winners_pdf_url && (
+                <a
+                  href={event.certificate_templates.winners_pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-md shadow-amber-900/30"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </a>
+              )}
+              {event.certificate_templates?.winners_pptx_url && (
+                <a
+                  href={event.certificate_templates.winners_pptx_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-amber-500/40 hover:bg-amber-950 text-amber-300 text-xs font-semibold flex items-center gap-1 transition"
+                  title="Download multi-slide editable PowerPoint template"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>PPTX</span>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Participation Cloud File */}
+          <div className="bg-black/40 rounded-xl p-4 border border-cyan-500/30 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Award className="w-5 h-5 text-cyan-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-cyan-200 truncate">
+                  Participation Batch Certificate
+                </div>
+                <div className="text-xs text-slate-400">
+                  {event.certificate_templates?.participation_pdf_url ? (
+                    <span className="text-emerald-400 font-medium">
+                      ✓ Ready ({event.certificate_templates.participation_pdf_count || totalParticipantsCount} participants)
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 italic">Not yet compiled to cloud</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {event.certificate_templates?.participation_pdf_url && (
+                <a
+                  href={event.certificate_templates.participation_pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-md shadow-cyan-900/30"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </a>
+              )}
+              {event.certificate_templates?.participation_master_pptx_url && (
+                <a
+                  href={event.certificate_templates.participation_master_pptx_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-cyan-500/40 hover:bg-cyan-950 text-cyan-300 text-xs font-semibold flex items-center gap-1 transition"
+                  title="Download multi-slide editable PowerPoint template"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>PPTX</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {event.certificate_templates?.last_generated_at && (
+          <div className="text-[11px] text-slate-400 text-right">
+            Last compiled: {new Date(event.certificate_templates.last_generated_at).toLocaleString()}
+          </div>
+        )}
       </div>
 
       {/* COMPACT WINNER SELECTION (ONLY SHOWN WHEN PARTICIPANTS ARE LOADED) */}

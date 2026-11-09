@@ -504,3 +504,48 @@ export async function uploadCertificateTemplateToSupabase(
     return null;
   }
 }
+
+/**
+ * Uploads a generated batch certificates PDF or multi-slide PPTX to Supabase Storage Bucket,
+ * e.g. `certificate-templates/{eventId}/winners_certificates.pdf`
+ * Making it accessible immediately to any associate or device.
+ */
+export async function uploadGeneratedCertificatesToSupabase(
+  fileBlob: Blob,
+  eventId: string,
+  type: "winners" | "participation",
+  format: "pdf" | "pptx" = "pdf"
+): Promise<string | null> {
+  if (!supabase) return null;
+
+  try {
+    const filename = `${type}_certificates.${format}`;
+    const filePath = `${eventId}/${filename}`;
+    const contentType =
+      format === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+    const { error: uploadErr } = await supabase.storage
+      .from(CERTIFICATE_BUCKET)
+      .upload(filePath, fileBlob, {
+        cacheControl: "3600",
+        upsert: true,
+        contentType: contentType,
+      });
+
+    if (uploadErr) {
+      console.warn("Supabase Storage certificate upload warning:", uploadErr.message);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from(CERTIFICATE_BUCKET)
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
+  } catch (err) {
+    console.warn("Upload generated certificates to Supabase failed:", err);
+    return null;
+  }
+}

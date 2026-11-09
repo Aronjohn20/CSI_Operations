@@ -104,6 +104,13 @@ export interface CSIEvent {
     participation_pptx_url?: string;
     appreciation_filename?: string;
     participation_filename?: string;
+    winners_pdf_url?: string; // Permanent Supabase Storage URL for generated batch PDF
+    participation_pdf_url?: string;
+    winners_pptx_url?: string; // Permanent Supabase Storage URL for generated batch PPTX
+    participation_master_pptx_url?: string;
+    winners_pdf_count?: number;
+    participation_pdf_count?: number;
+    last_generated_at?: string;
   };
   certificate_writeups?: {
     appreciation_writeup?: string;
