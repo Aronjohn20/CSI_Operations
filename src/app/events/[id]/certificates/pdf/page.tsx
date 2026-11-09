@@ -309,7 +309,7 @@ export default function CertificatePdfStudioPage() {
       if (activeTab === "appreciation" && (currentWinnerPos === "1st" || currentWinnerPos === "2nd" || currentWinnerPos === "3rd")) {
         // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(464, 604, 146, 32);
+        ctx.fillRect(473, 598, 157, 44);
 
         const num = currentWinnerPos === "1st" ? "1" : currentWinnerPos === "2nd" ? "2" : "3";
         const suffix = currentWinnerPos === "1st" ? "st" : currentWinnerPos === "2nd" ? "nd" : "rd";
@@ -318,19 +318,20 @@ export default function CertificatePdfStudioPage() {
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
 
-        // Main number: bold 28px Times New Roman
-        ctx.font = 'bold 28px "Times New Roman", serif';
-        ctx.fillText(num, 466, 630);
+        const startX = 488;
+        // Main number: bold 33px Times New Roman
+        ctx.font = 'bold 33px "Times New Roman", serif';
+        ctx.fillText(num, startX, 630);
         const numW = ctx.measureText(num).width;
 
-        // Superscript ordinal suffix: bold 19px Times New Roman
-        ctx.font = 'bold 19px "Times New Roman", serif';
-        ctx.fillText(suffix, 466 + numW, 619);
+        // Superscript ordinal suffix: bold 22px Times New Roman
+        ctx.font = 'bold 22px "Times New Roman", serif';
+        ctx.fillText(suffix, startX + numW + 1, 617);
         const suffixW = ctx.measureText(suffix).width;
 
-        // Word " place": bold 28px Times New Roman
-        ctx.font = 'bold 28px "Times New Roman", serif';
-        ctx.fillText(" place", 466 + numW + suffixW, 630);
+        // Word " place": bold 33px Times New Roman
+        ctx.font = 'bold 33px "Times New Roman", serif';
+        ctx.fillText(" place", startX + numW + suffixW + 1, 630);
       }
     };
 
@@ -406,7 +407,7 @@ export default function CertificatePdfStudioPage() {
         if (position === "1st" || position === "2nd" || position === "3rd") {
           // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
           ctx.fillStyle = "#ffffff";
-          ctx.fillRect(464, 604, 146, 32);
+          ctx.fillRect(473, 598, 157, 44);
 
           const num = position === "1st" ? "1" : position === "2nd" ? "2" : "3";
           const suffix = position === "1st" ? "st" : position === "2nd" ? "nd" : "rd";
@@ -415,19 +416,20 @@ export default function CertificatePdfStudioPage() {
           ctx.textAlign = "left";
           ctx.textBaseline = "alphabetic";
 
-          // Main number: bold 28px Times New Roman
-          ctx.font = 'bold 28px "Times New Roman", serif';
-          ctx.fillText(num, 466, 630);
+          const startX = 488;
+          // Main number: bold 33px Times New Roman
+          ctx.font = 'bold 33px "Times New Roman", serif';
+          ctx.fillText(num, startX, 630);
           const numW = ctx.measureText(num).width;
 
-          // Superscript ordinal suffix: bold 19px Times New Roman
-          ctx.font = 'bold 19px "Times New Roman", serif';
-          ctx.fillText(suffix, 466 + numW, 619);
+          // Superscript ordinal suffix: bold 22px Times New Roman
+          ctx.font = 'bold 22px "Times New Roman", serif';
+          ctx.fillText(suffix, startX + numW + 1, 617);
           const suffixW = ctx.measureText(suffix).width;
 
-          // Word " place": bold 28px Times New Roman
-          ctx.font = 'bold 28px "Times New Roman", serif';
-          ctx.fillText(" place", 466 + numW + suffixW, 630);
+          // Word " place": bold 33px Times New Roman
+          ctx.font = 'bold 33px "Times New Roman", serif';
+          ctx.fillText(" place", startX + numW + suffixW + 1, 630);
         }
 
         resolve(canvas.toDataURL("image/jpeg", 0.96));
