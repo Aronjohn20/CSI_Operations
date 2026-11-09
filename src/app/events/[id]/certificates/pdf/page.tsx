@@ -210,22 +210,32 @@ export default function CertificatePdfStudioPage() {
 
       // 1. Cleanly wipe out <<name>> placeholder while leaving the template's underline intact below
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(360, 430, 1200, 122);
+      ctx.fillRect(360, 425, 1200, 128);
 
       // 2. Draw student's name in exact PowerPoint gold gradient
       // Matching OpenXML: pos 0 = #CF9F1C, pos 100000 = #AA8021
-      const textGrad = ctx.createLinearGradient(960 - 340, 0, 960 + 340, 0);
+      const textGrad = ctx.createLinearGradient(960 - 400, 0, 960 + 400, 0);
       textGrad.addColorStop(0, "#CF9F1C");
       textGrad.addColorStop(0.5, "#E8C862");
       textGrad.addColorStop(1, "#AA8021");
       ctx.fillStyle = textGrad;
+      ctx.strokeStyle = textGrad;
 
-      // 3. Palace Script MT bold cursive font stack
+      // 3. Palace Script MT large bold cursive font
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font =
-        'bold italic 106px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive';
-      ctx.fillText(nameToRender, 960, 504);
+      let fontSize = 145;
+      ctx.font = `bold italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive`;
+      while (ctx.measureText(nameToRender).width > 1200 && fontSize > 80) {
+        fontSize -= 4;
+        ctx.font = `bold italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive`;
+      }
+
+      // 4. Stroke + Fill for true substantial boldness & rich gold body
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 3.5;
+      ctx.strokeText(nameToRender, 960, 502);
+      ctx.fillText(nameToRender, 960, 502);
     };
 
     if (templateBg) {
@@ -266,21 +276,31 @@ export default function CertificatePdfStudioPage() {
 
         // 1. Cleanly wipe out <<name>> placeholder while leaving template underline intact
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(360, 430, 1200, 122);
+        ctx.fillRect(360, 425, 1200, 128);
 
         // 2. Draw student's real name in matching bold gold cursive calligraphy
         const formatted = formatCertificateName(name);
-        const textGrad = ctx.createLinearGradient(960 - 340, 0, 960 + 340, 0);
+        const textGrad = ctx.createLinearGradient(960 - 400, 0, 960 + 400, 0);
         textGrad.addColorStop(0, "#CF9F1C");
         textGrad.addColorStop(0.5, "#E8C862");
         textGrad.addColorStop(1, "#AA8021");
         ctx.fillStyle = textGrad;
+        ctx.strokeStyle = textGrad;
 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.font =
-          'bold italic 106px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive';
-        ctx.fillText(formatted, 960, 504);
+        let fontSize = 145;
+        ctx.font = `bold italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive`;
+        while (ctx.measureText(formatted).width > 1200 && fontSize > 80) {
+          fontSize -= 4;
+          ctx.font = `bold italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive`;
+        }
+
+        // Stroke + Fill for true substantial boldness & rich gold body
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 3.5;
+        ctx.strokeText(formatted, 960, 502);
+        ctx.fillText(formatted, 960, 502);
 
         resolve(canvas.toDataURL("image/jpeg", 0.96));
       };
