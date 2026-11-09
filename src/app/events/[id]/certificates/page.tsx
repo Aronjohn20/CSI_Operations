@@ -998,6 +998,15 @@ export default function CertificateStudioPage() {
             <span>Coordinator Studio</span>
           </Link>
 
+          <Link
+            href={`/events/${event.id}/certificates/pdf`}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white text-[15px] font-bold flex items-center gap-2 transition shadow-lg shadow-emerald-900/30 border border-emerald-400/40"
+            title="Convert and export pristine 4K PDFs client-side with zero Linux/Vercel issues"
+          >
+            <FileText className="w-4 h-4 text-emerald-200" />
+            <span>High-Res PDF Studio</span>
+          </Link>
+
           <button
             onClick={() => setIsImportModalOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white text-[15px] font-bold flex items-center gap-2 transition shadow-lg shadow-purple-900/30 border border-purple-400/40"

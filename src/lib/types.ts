@@ -100,6 +100,8 @@ export interface CSIEvent {
   certificate_templates?: {
     appreciation_template_data?: string; // Base64 data URL or preview image
     participation_template_data?: string;
+    appreciation_slide_url?: string; // High-resolution slide background image
+    participation_slide_url?: string;
     appreciation_pptx_url?: string; // Permanent Supabase Storage URL
     participation_pptx_url?: string;
     appreciation_filename?: string;
