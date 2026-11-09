@@ -3,7 +3,7 @@ import { CSIEvent, RegisteredAttendee } from "./types";
 /**
  * Maps branch abbreviations to official RSET departmental names
  */
-export function getDepartmentChoices(targetBranches: string[]): string[] {
+export function getDepartmentChoices(targetBranches?: string[]): string[] {
   const branchMap: Record<string, string> = {
     AD: "AI&DS",
     CSE: "CSE",
