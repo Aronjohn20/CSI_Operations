@@ -221,14 +221,14 @@ export default function CertificatePdfStudioPage() {
       ctx.fillStyle = textGrad;
       ctx.strokeStyle = textGrad;
 
-      // 3. Elegant cursive calligraphy font at 105px
+      // 3. Palace Script MT (matches exact PowerPoint template font)
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       let fontSize = 105;
-      ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
+      ctx.font = `italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", cursive`;
       while (ctx.measureText(nameToRender).width > 1200 && fontSize > 65) {
         fontSize -= 3;
-        ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
+        ctx.font = `italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", cursive`;
       }
 
       // 4. Gold stroke of 2px + fill for distinct bold calligraphy
@@ -278,7 +278,7 @@ export default function CertificatePdfStudioPage() {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(360, 420, 1200, 134);
 
-        // 2. Draw student's real name in matching gold cursive calligraphy at 105px with 2px stroke
+        // 2. Draw student's real name in Palace Script MT matching exact PowerPoint template font
         const formatted = formatCertificateName(name);
         const textGrad = ctx.createLinearGradient(960 - 450, 0, 960 + 450, 0);
         textGrad.addColorStop(0, "#CF9F1C");
@@ -290,10 +290,10 @@ export default function CertificatePdfStudioPage() {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         let fontSize = 105;
-        ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
+        ctx.font = `italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", cursive`;
         while (ctx.measureText(formatted).width > 1200 && fontSize > 65) {
           fontSize -= 3;
-          ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
+          ctx.font = `italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", cursive`;
         }
 
         // Gold stroke of 2px + fill for distinct bold calligraphy
