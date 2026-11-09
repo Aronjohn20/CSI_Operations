@@ -224,9 +224,9 @@ export default function CertificatePdfStudioPage() {
       // 3. Palace Script MT (matches exact PowerPoint template font)
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      let fontSize = 105;
+      let fontSize = 120;
       ctx.font = `italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", cursive`;
-      while (ctx.measureText(nameToRender).width > 1200 && fontSize > 65) {
+      while (ctx.measureText(nameToRender).width > 1250 && fontSize > 70) {
         fontSize -= 3;
         ctx.font = `italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", cursive`;
       }
@@ -289,9 +289,9 @@ export default function CertificatePdfStudioPage() {
 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        let fontSize = 105;
+        let fontSize = 120;
         ctx.font = `italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", cursive`;
-        while (ctx.measureText(formatted).width > 1200 && fontSize > 65) {
+        while (ctx.measureText(formatted).width > 1250 && fontSize > 70) {
           fontSize -= 3;
           ctx.font = `italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", cursive`;
         }
