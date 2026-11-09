@@ -309,7 +309,7 @@ export default function CertificatePdfStudioPage() {
       if (activeTab === "appreciation" && (currentWinnerPos === "1st" || currentWinnerPos === "2nd" || currentWinnerPos === "3rd")) {
         // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(473, 598, 140, 44);
+        ctx.fillRect(460, 598, 140, 44);
 
         const num = currentWinnerPos === "1st" ? "1" : currentWinnerPos === "2nd" ? "2" : "3";
         const suffix = currentWinnerPos === "1st" ? "st" : currentWinnerPos === "2nd" ? "nd" : "rd";
@@ -407,7 +407,7 @@ export default function CertificatePdfStudioPage() {
         if (position === "1st" || position === "2nd" || position === "3rd") {
           // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
           ctx.fillStyle = "#ffffff";
-          ctx.fillRect(473, 598, 140, 44);
+          ctx.fillRect(460, 598, 140, 44);
 
           const num = position === "1st" ? "1" : position === "2nd" ? "2" : "3";
           const suffix = position === "1st" ? "st" : position === "2nd" ? "nd" : "rd";
