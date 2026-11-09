@@ -62,14 +62,15 @@ export default function CertificatePdfStudioPage() {
   const [fontLoaded, setFontLoaded] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Load Great Vibes calligraphy font to match the template's <<name>> font
+  // Load calligraphy script fonts matching the template's Palace Script MT
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const fontId = "great-vibes-font";
+    const fontId = "certificate-cursive-fonts";
     if (!document.getElementById(fontId)) {
       const link = document.createElement("link");
       link.id = fontId;
-      link.href = "https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap";
+      link.href =
+        "https://fonts.googleapis.com/css2?family=Alex+Brush&family=Allura&family=Great+Vibes&family=Pinyon+Script&display=swap";
       link.rel = "stylesheet";
       document.head.appendChild(link);
     }
@@ -207,25 +208,24 @@ export default function CertificatePdfStudioPage() {
         );
       }
 
-      // 1. Cleanly wipe out <<name>> and any placeholder text completely
+      // 1. Cleanly wipe out <<name>> placeholder while leaving the template's underline intact below
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(380, 420, 1160, 130);
+      ctx.fillRect(360, 435, 1200, 115);
 
-      // 2. Draw student's name in the exact gold script calligraphy font of <<name>>
+      // 2. Draw student's name in exact PowerPoint gold gradient
+      // Matching OpenXML: pos 0 = #CF9F1C, pos 100000 = #AA8021
+      const textGrad = ctx.createLinearGradient(960 - 280, 0, 960 + 280, 0);
+      textGrad.addColorStop(0, "#CF9F1C");
+      textGrad.addColorStop(0.5, "#E8C862");
+      textGrad.addColorStop(1, "#AA8021");
+      ctx.fillStyle = textGrad;
+
+      // 3. Palace Script MT cursive font stack (NO Times New Roman or generic serif fallback)
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#B4833E"; // Warm rich metallic gold matching <<name>>
-      ctx.font = 'italic 76px "Brush Script MT", "Great Vibes", "Edwardian Script ITC", "Lucida Handwriting", "Playfair Display", "Times New Roman", cursive';
-      ctx.fillText(nameToRender, 960, 475);
-
-      // 3. Draw clean elegant matching gold underline under student name
-      const textWidth = ctx.measureText(nameToRender).width;
-      ctx.strokeStyle = "#B4833E";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(960 - textWidth / 2 - 20, 515);
-      ctx.lineTo(960 + textWidth / 2 + 20, 515);
-      ctx.stroke();
+      ctx.font =
+        'italic 86px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive';
+      ctx.fillText(nameToRender, 960, 508);
     };
 
     if (templateBg) {
@@ -240,7 +240,15 @@ export default function CertificatePdfStudioPage() {
   }, [templateBg, currentPreviewAttendee, activeTab, fontLoaded]);
 
   // Helper to stamp a single certificate on an offscreen canvas and return Data URL
-  const stampCertificate = (name: string, bgSrc?: string): Promise<string> => {
+  const stampCertificate = async (name: string, bgSrc?: string): Promise<string> => {
+    if (typeof document !== "undefined" && document.fonts) {
+      try {
+        await document.fonts.ready;
+      } catch {
+        // ignore
+      }
+    }
+
     return new Promise((resolve) => {
       const canvas = document.createElement("canvas");
       canvas.width = 1920;
@@ -256,26 +264,23 @@ export default function CertificatePdfStudioPage() {
           ctx.fillRect(0, 0, 1920, 1080);
         }
 
-        // 1. Cleanly wipe out <<name>> and placeholder text completely
+        // 1. Cleanly wipe out <<name>> placeholder while leaving template underline intact
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(380, 420, 1160, 130);
+        ctx.fillRect(360, 435, 1200, 115);
 
-        // 2. Draw student's real name in matching gold calligraphy script
+        // 2. Draw student's real name in matching gold cursive calligraphy
         const formatted = formatCertificateName(name);
+        const textGrad = ctx.createLinearGradient(960 - 280, 0, 960 + 280, 0);
+        textGrad.addColorStop(0, "#CF9F1C");
+        textGrad.addColorStop(0.5, "#E8C862");
+        textGrad.addColorStop(1, "#AA8021");
+        ctx.fillStyle = textGrad;
+
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillStyle = "#B4833E"; // Warm rich metallic gold matching <<name>>
-        ctx.font = 'italic 76px "Brush Script MT", "Great Vibes", "Edwardian Script ITC", "Lucida Handwriting", "Playfair Display", "Times New Roman", cursive';
-        ctx.fillText(formatted, 960, 475);
-
-        // 3. Draw clean matching gold underline
-        const textWidth = ctx.measureText(formatted).width;
-        ctx.strokeStyle = "#B4833E";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(960 - textWidth / 2 - 20, 515);
-        ctx.lineTo(960 + textWidth / 2 + 20, 515);
-        ctx.stroke();
+        ctx.font =
+          'italic 86px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive';
+        ctx.fillText(formatted, 960, 508);
 
         resolve(canvas.toDataURL("image/jpeg", 0.96));
       };
@@ -456,6 +461,11 @@ export default function CertificatePdfStudioPage() {
 
   return (
     <div className="min-h-screen bg-[#08070E] text-slate-100 p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Preload Google Cursive Calligraphy Fonts */}
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Allura&family=Great+Vibes&family=Pinyon+Script&display=swap"
+      />
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-purple-500/20 pb-5">
         <div className="space-y-1">
