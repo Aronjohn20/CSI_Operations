@@ -485,7 +485,7 @@ export default function CertificateStudioPage() {
       try {
         const pos = getWinnerPosition(currentPreviewAttendee, winnersObject);
         const formattedName = formatCertificateName(currentPreviewAttendee.name);
-        const customizedPptx = await createPptxWithName(activePptx.buffer, formattedName, pos);
+        const customizedPptx = await createPptxWithName(activePptx.buffer, formattedName, pos, event || undefined);
         const b64 = arrayBufferToBase64(customizedPptx);
 
         const res = await fetch("/api/convert-pptx", {
@@ -523,6 +523,9 @@ export default function CertificateStudioPage() {
     secondPlaceWinners,
     thirdPlaceWinners,
     winnersObject,
+    event?.event_name,
+    event?.event_date,
+    event?.mode,
   ]);
 
   // Handle Import File (.xlsx, .xls, .csv, .tsv)

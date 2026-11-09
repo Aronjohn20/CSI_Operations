@@ -258,13 +258,149 @@ export function replacePositionInSlideXml(
 }
 
 /**
- * Creates a customized PPTX file by replacing <<name>> AND position in slide XMLs
+ * Format date with day first ordinal (e.g. "16th September 2026")
+ */
+export function formatDayFirstOrdinalDate(dateStr: string): string {
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const months = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const j = day % 10, k = day % 100;
+      let suffix = "th";
+      if (j === 1 && k !== 11) suffix = "st";
+      else if (j === 2 && k !== 12) suffix = "nd";
+      else if (j === 3 && k !== 13) suffix = "rd";
+      return `${day}${suffix} ${months[month]} ${year}`;
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
+ * Intelligently updates the certificate write-up in slide OpenXML:
+ * 1. Replaces explicit placeholders: <<writeup>>, <<event_name>>, <<date>>, <<mode>>, <<position>>
+ * 2. If a template has hardcoded text from an earlier event (e.g. Retro Rumble, 16th September 2026),
+ *    detects and swaps them with the current event's actual parameters!
+ */
+export function replaceWriteupInSlideXml(
+  xml: string,
+  event?: Partial<CSIEvent>,
+  position?: "1st" | "2nd" | "3rd" | "participant"
+): string {
+  if (!event) return xml;
+
+  const eventName = event.event_name || "";
+  const eventDate = event.event_date || "";
+  const mode = (event.mode || "Offline").toLowerCase();
+  const formattedDate = eventDate ? formatDayFirstOrdinalDate(eventDate) : "";
+
+  // 1. Explicit placeholder tags in slide XML
+  if (eventName) {
+    xml = xml.replace(
+      /(<<event_name>>|&lt;&lt;event_name&gt;&gt;|<<event>>|&lt;&lt;event&gt;&gt;|<<title>>|&lt;&lt;title&gt;&gt;|\{\{event_name\}\}|\{\{event\}\}|\{\{title\}\})/gi,
+      eventName
+    );
+  }
+
+  if (formattedDate) {
+    xml = xml.replace(
+      /(<<event_date>>|&lt;&lt;event_date&gt;&gt;|<<date>>|&lt;&lt;date&gt;&gt;|\{\{event_date\}\}|\{\{date\}\})/gi,
+      formattedDate
+    );
+  }
+
+  xml = xml.replace(
+    /(<<mode>>|&lt;&lt;mode&gt;&gt;|\{\{mode\}\})/gi,
+    mode
+  );
+
+  // Full writeup placeholder: <<writeup>>
+  const isWinner = position === "1st" || position === "2nd" || position === "3rd";
+  const posText = isWinner ? `${position} place` : "participant";
+  const writeupSentence = isWinner
+    ? `has secured ${posText} in the ${mode} event titled ${eventName}, held on ${formattedDate}, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.`
+    : `has actively participated in the ${mode} event titled ${eventName}, held on ${formattedDate}, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.`
+
+  xml = xml.replace(
+    /(<<writeup>>|&lt;&lt;writeup&gt;&gt;|\{\{writeup\}\}|\{writeup\}|\[writeup\])/gi,
+    writeupSentence
+  );
+
+  // 2. Intelligent dynamic swap of existing event details inside the template text:
+  // A. Event Title in the paragraph: e.g. "titled Retro Rumble" -> "titled <event.event_name>"
+  if (eventName) {
+    xml = xml.replace(
+      /(titled\s+)(?:<[^>]+>)*?(?:Retro Rumble|Bug Se Azadi|Traceback|Cache Quest[^,<]*|Coder of the Month[^,<]*|Tech-Jeopardy|Build &amp; Ship[^,<]*|Real or Cake|Say Cheese|Keeping it Reel|History But Wrong|Off the Script)(?:<\/[^>]+>)*?([,.\s])/gi,
+      `$1${eventName}$2`
+    );
+
+    // If "Retro Rumble" appears as literal text run
+    if (!eventName.toLowerCase().includes("retro rumble")) {
+      xml = xml.replace(
+        /(<a:t[^>]*>(?:(?!<\/a:t>)[\s\S])*?)Retro Rumble((?:(?!<\/a:t>)[\s\S])*?<\/a:t>)/gi,
+        `$1${eventName}$2`
+      );
+    }
+  }
+
+  // B. Event Date in the paragraph: e.g. "held on 16th September 2026" -> "held on <formattedDate>"
+  if (formattedDate) {
+    xml = xml.replace(
+      /(held on\s+)(?:<[^>]+>)*?(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})(?:<\/[^>]+>)*?([,.\s])/gi,
+      `$1${formattedDate}$2`
+    );
+
+    if (formattedDate !== "16th September 2026") {
+      xml = xml.replace(
+        /(<a:t[^>]*>(?:(?!<\/a:t>)[\s\S])*?)16th September 2026((?:(?!<\/a:t>)[\s\S])*?<\/a:t>)/gi,
+        `$1${formattedDate}$2`
+      );
+    }
+  }
+
+  // C. Event Mode in the paragraph: "in the online Intra-College" / "in the offline Intra-College"
+  xml = xml.replace(
+    /(in the\s+)(?:online|offline)(\s+Intra-College|\s+technical|\s+event|\s+competition)/gi,
+    `$1${mode}$2`
+  );
+
+  // D. Winner vs Participant phrase adaptation:
+  if (position === "participant") {
+    xml = xml.replace(
+      /has secured\s+(?:1st|2nd|3rd|\d(?:st|nd|rd|th))\s+place\s+in/gi,
+      "has actively participated in"
+    );
+    xml = xml.replace(
+      /CERTIFICATE OF APPRECIATION/gi,
+      "CERTIFICATE OF PARTICIPATION"
+    );
+  } else if (isWinner) {
+    xml = xml.replace(
+      /has (?:actively\s+)?participated in/gi,
+      `has secured ${position} place in`
+    );
+  }
+
+  return xml;
+}
+
+/**
+ * Creates a customized PPTX file by replacing <<name>>, position, and event writeup in slide XMLs
  * Matches the exact Python python-pptx behavior!
  */
 export async function createPptxWithName(
   templatePptxBuffer: ArrayBuffer,
   replacementName: string,
-  position?: "1st" | "2nd" | "3rd" | "participant"
+  position?: "1st" | "2nd" | "3rd" | "participant",
+  event?: Partial<CSIEvent>
 ): Promise<ArrayBuffer> {
   const zip = await JSZip.loadAsync(templatePptxBuffer);
   const slideFiles = Object.keys(zip.files).filter(
@@ -294,6 +430,11 @@ export async function createPptxWithName(
 
     // Replace placement position (1st, 2nd, 3rd)
     xml = replacePositionInSlideXml(xml, position);
+
+    // Dynamically replace event details in writeup
+    if (event) {
+      xml = replaceWriteupInSlideXml(xml, event, position);
+    }
 
     zip.file(slidePath, xml);
   }
@@ -646,7 +787,12 @@ export async function exportCertificatesZip(
       const formattedName = formatCertificateName(att.name);
       const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
 
-      const pptxData = await createPptxWithName(templatePptxBuffer, formattedName, pos);
+      const pptxData = await createPptxWithName(templatePptxBuffer, formattedName, pos, {
+        event_name: eventName,
+        event_date: eventDate,
+        venue: venue,
+        mode: venue.toLowerCase().includes("online") || venue.toLowerCase().includes("hackerrank") ? "Online" : "Offline",
+      });
       const b64 = arrayBufferToBase64(pptxData);
 
       pptxItems.push({
