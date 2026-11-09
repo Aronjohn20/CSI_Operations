@@ -309,7 +309,7 @@ export default function CertificatePdfStudioPage() {
       if (activeTab === "appreciation" && (currentWinnerPos === "1st" || currentWinnerPos === "2nd" || currentWinnerPos === "3rd")) {
         // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(473, 598, 150, 44);
+        ctx.fillRect(473, 598, 140, 44);
 
         const num = currentWinnerPos === "1st" ? "1" : currentWinnerPos === "2nd" ? "2" : "3";
         const suffix = currentWinnerPos === "1st" ? "st" : currentWinnerPos === "2nd" ? "nd" : "rd";
@@ -318,7 +318,7 @@ export default function CertificatePdfStudioPage() {
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
 
-        const startX = 488;
+        const startX = 480;
         // Main number: bold 33px Times New Roman
         ctx.font = 'bold 33px "Times New Roman", serif';
         ctx.fillText(num, startX, 630);
@@ -407,7 +407,7 @@ export default function CertificatePdfStudioPage() {
         if (position === "1st" || position === "2nd" || position === "3rd") {
           // Cleanly wipe out "3rd place" placeholder on Line 1 without touching Line 2 below or "has secured " on the left
           ctx.fillStyle = "#ffffff";
-          ctx.fillRect(473, 598, 157, 44);
+          ctx.fillRect(473, 598, 140, 44);
 
           const num = position === "1st" ? "1" : position === "2nd" ? "2" : "3";
           const suffix = position === "1st" ? "st" : position === "2nd" ? "nd" : "rd";
