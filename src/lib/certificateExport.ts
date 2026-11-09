@@ -111,9 +111,46 @@ export function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 /**
+ * Renders Slide 1 of a PPTX file directly to a 1080p JPEG Data URL in the browser
+ * using client-side canvas rendering (zero serverless / Linux dependencies, works on Vercel).
+ */
+export async function renderPptxSlideToDataUrl(fileOrBuffer: File | ArrayBuffer): Promise<string | null> {
+  if (typeof window === "undefined" || typeof document === "undefined") return null;
+
+  try {
+    // Dynamic import to prevent SSR evaluation on server
+    const pptxMod = await import("pptxviewjs");
+    const PPTXViewerClass = pptxMod.PPTXViewer || (pptxMod as any).default?.PPTXViewer;
+    if (!PPTXViewerClass) {
+      console.warn("PPTXViewer class not found in pptxviewjs module");
+      return null;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 1920;
+    canvas.height = 1080;
+
+    const viewer = new PPTXViewerClass({
+      canvas: canvas,
+      width: 1920,
+      height: 1080,
+    });
+
+    await viewer.loadFile(fileOrBuffer);
+    await viewer.render(canvas, { slideIndex: 0 });
+
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+    return dataUrl;
+  } catch (err) {
+    console.warn("Client-side PPTX slide canvas rendering failed:", err);
+    return null;
+  }
+}
+
+/**
  * Parses an uploaded PPTX template file:
  * - Stores the raw PPTX bytes for dynamic <<name>> & position replacement
- * - Calls the local PowerPoint conversion API (/api/convert-pptx) to export a pristine 1080p preview of Slide 1
+ * - Converts Slide 1 directly in the browser via canvas (or local PowerPoint COM) into a 1080p slide image
  */
 export async function extractPptxData(file: File): Promise<{
   pptxBuffer: ArrayBuffer;
@@ -123,7 +160,7 @@ export async function extractPptxData(file: File): Promise<{
   const buffer = await file.arrayBuffer();
   let previewImageBase64: string | undefined = undefined;
 
-  // 1. Try high-fidelity slide preview from PowerPoint COM via /api/convert-pptx
+  // 1. Try high-fidelity slide preview from PowerPoint COM via /api/convert-pptx (if on Windows)
   try {
     const b64 = arrayBufferToBase64(buffer);
     const res = await fetch("/api/convert-pptx", {
@@ -142,9 +179,18 @@ export async function extractPptxData(file: File): Promise<{
     console.warn("Could not fetch PowerPoint slide preview from API:", err);
   }
 
-  // If PowerPoint COM is available (on Windows localhost), previewImageBase64 is returned.
-  // On Vercel / Linux, previewImageBase64 is cleanly undefined, which automatically
-  // instructs the system to render the official CSI SB RSET vector certificate (Image 2).
+  // 2. On Vercel / Linux (or when COM is unavailable), render directly in the browser using HTML5 Canvas!
+  if (!previewImageBase64) {
+    try {
+      const clientRendered = await renderPptxSlideToDataUrl(file);
+      if (clientRendered) {
+        previewImageBase64 = clientRendered;
+      }
+    } catch (clientErr) {
+      console.warn("Client-side PPTX canvas fallback failed:", clientErr);
+    }
+  }
+
   return {
     pptxBuffer: buffer,
     previewImageBase64,
