@@ -312,7 +312,7 @@ export function replaceWriteupInSlideXml(
     );
   }
 
-  // Also replace any other past event title across XML tags:
+  // Also replace any other past event title across XML tags (using word boundaries so "Cache Quest" doesn't corrupt "Cache Quest 2"):
   const pastEvents = [
     "Bug Se Azadi",
     "Traceback",
@@ -326,14 +326,19 @@ export function replaceWriteupInSlideXml(
     "Tech-Jeopardy",
   ];
   for (const pe of pastEvents) {
-    if (eventName && pe.toLowerCase() !== eventName.toLowerCase()) {
+    // Skip if current eventName is a continuation or version (e.g. Cache Quest vs Cache Quest 2)
+    if (
+      eventName &&
+      pe.toLowerCase() !== eventName.toLowerCase() &&
+      !eventName.toLowerCase().startsWith(pe.toLowerCase())
+    ) {
       try {
         const reg = new RegExp(
-          pe
+          `\\b${pe
             .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
             .split(/\s+/)
             .map((w) => w.split("").join("(?:<[^>]+>)*?"))
-            .join("(?:<[^>]+>|\\s)+"),
+            .join("(?:<[^>]+>|\\s)+")}\\b(?!\\s*\\d)`,
           "gi"
         );
         xml = xml.replace(reg, eventName);
