@@ -46,8 +46,9 @@ export default function CertificatePdfStudioPage() {
   const [secondPlaceWinners, setSecondPlaceWinners] = useState<string[]>([]);
   const [thirdPlaceWinners, setThirdPlaceWinners] = useState<string[]>([]);
 
-  // Certificate Slide Template Image (Data URL or Supabase URL)
-  const [templateBg, setTemplateBg] = useState<string>("");
+  // Certificate Slide Template Images (Appreciation for Winners, Participation for Participants)
+  const [appreciationSlideBg, setAppreciationSlideBg] = useState<string>("");
+  const [participationSlideBg, setParticipationSlideBg] = useState<string>("");
 
   // Mode Selection: "appreciation" | "participation"
   const [activeTab, setActiveTab] = useState<"appreciation" | "participation">("appreciation");
@@ -98,15 +99,16 @@ export default function CertificatePdfStudioPage() {
 
       // Check for saved slide background images or templates
       const templates = found.certificate_templates;
-      const initialBg =
+      const apprBg =
         templates?.appreciation_slide_url ||
-        templates?.participation_slide_url ||
         templates?.appreciation_template_data ||
+        "";
+      const partBg =
+        templates?.participation_slide_url ||
         templates?.participation_template_data ||
         "";
-      if (initialBg) {
-        setTemplateBg(initialBg);
-      }
+      if (apprBg) setAppreciationSlideBg(apprBg);
+      if (partBg) setParticipationSlideBg(partBg);
     }
     setLoading(false);
   }, [eventId]);
@@ -147,7 +149,11 @@ export default function CertificatePdfStudioPage() {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      setTemplateBg(result);
+      if (activeTab === "appreciation") {
+        setAppreciationSlideBg(result);
+      } else {
+        setParticipationSlideBg(result);
+      }
 
       // Save to event
       if (event) {
@@ -155,10 +161,15 @@ export default function CertificatePdfStudioPage() {
           ...event,
           certificate_templates: {
             ...(event.certificate_templates || {}),
-            appreciation_slide_url: result,
-            participation_slide_url: result,
-            appreciation_template_data: result,
-            participation_template_data: result,
+            ...(activeTab === "appreciation"
+              ? {
+                  appreciation_slide_url: result,
+                  appreciation_template_data: result,
+                }
+              : {
+                  participation_slide_url: result,
+                  participation_template_data: result,
+                }),
           },
         };
         setEvent(updated);
@@ -167,13 +178,15 @@ export default function CertificatePdfStudioPage() {
 
       setStatusNotice({
         type: "success",
-        text: "Loaded certificate template background image successfully!",
+        text: `Loaded ${activeTab === "appreciation" ? "Appreciation" : "Participation"} slide template image successfully!`,
       });
     };
     reader.readAsDataURL(file);
   };
 
-  // Draw Live Preview Canvas - Wipes out <<name>> and cleanly replaces with real name
+  const activeTemplateBg = activeTab === "appreciation" ? appreciationSlideBg : participationSlideBg;
+
+  // Draw Live Preview Canvas - Wipes out <<name>> and cleanly replaces with real name and dynamic position
   useEffect(() => {
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
@@ -181,6 +194,7 @@ export default function CertificatePdfStudioPage() {
     if (!ctx) return;
 
     const nameToRender = formatCertificateName(currentPreviewAttendee?.name || "PARTICIPANT NAME");
+    const currentWinnerPos = activeTab === "appreciation" ? getWinnerPosition(currentPreviewAttendee, winnersObject) : "participant";
 
     const renderCanvas = (img?: HTMLImageElement) => {
       canvas.width = 1920;
@@ -236,21 +250,37 @@ export default function CertificatePdfStudioPage() {
       ctx.lineWidth = 2;
       ctx.strokeText(nameToRender, 960, 504);
       ctx.fillText(nameToRender, 960, 504);
+
+      // 5. Dynamic Winner Position (1st, 2nd, 3rd) on Appreciation Certificate
+      if (activeTab === "appreciation" && (currentWinnerPos === "1st" || currentWinnerPos === "2nd" || currentWinnerPos === "3rd")) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(510, 626, 185, 38);
+
+        ctx.fillStyle = "#000000";
+        ctx.font = 'bold 30px "Times New Roman", serif';
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${currentWinnerPos} place`, 514, 645);
+      }
     };
 
-    if (templateBg) {
+    if (activeTemplateBg) {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => renderCanvas(img);
       img.onerror = () => renderCanvas();
-      img.src = templateBg;
+      img.src = activeTemplateBg;
     } else {
       renderCanvas();
     }
-  }, [templateBg, currentPreviewAttendee, activeTab, fontLoaded]);
+  }, [activeTemplateBg, currentPreviewAttendee, activeTab, fontLoaded, winnersObject]);
 
   // Helper to stamp a single certificate on an offscreen canvas and return Data URL
-  const stampCertificate = async (name: string, bgSrc?: string): Promise<string> => {
+  const stampCertificate = async (
+    name: string,
+    position: "1st" | "2nd" | "3rd" | "participant",
+    bgSrc?: string
+  ): Promise<string> => {
     if (typeof document !== "undefined" && document.fonts) {
       try {
         await document.fonts.ready;
@@ -302,6 +332,18 @@ export default function CertificatePdfStudioPage() {
         ctx.strokeText(formatted, 960, 504);
         ctx.fillText(formatted, 960, 504);
 
+        // 3. Dynamic Winner Position (1st, 2nd, 3rd) on Appreciation Certificate
+        if (position === "1st" || position === "2nd" || position === "3rd") {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(510, 626, 185, 38);
+
+          ctx.fillStyle = "#000000";
+          ctx.font = 'bold 30px "Times New Roman", serif';
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${position} place`, 514, 645);
+        }
+
         resolve(canvas.toDataURL("image/jpeg", 0.96));
       };
 
@@ -339,10 +381,12 @@ export default function CertificatePdfStudioPage() {
 
       for (let i = 0; i < list.length; i++) {
         const att = list[i];
+        const pos = getWinnerPosition(att, winnersObject);
         const formatted = formatCertificateName(att.name);
         const safeName = formatted.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
 
-        const dataUrl = await stampCertificate(att.name, templateBg);
+        const bgToUse = isWinners ? appreciationSlideBg : participationSlideBg;
+        const dataUrl = await stampCertificate(att.name, pos, bgToUse);
         const doc = new jsPDF({
           orientation: "landscape",
           unit: "mm",
@@ -361,7 +405,9 @@ export default function CertificatePdfStudioPage() {
 
       for (let i = 0; i < list.length; i++) {
         if (i > 0) masterDoc.addPage("a4", "landscape");
-        const dataUrl = await stampCertificate(list[i].name, templateBg);
+        const pos = getWinnerPosition(list[i], winnersObject);
+        const bgToUse = isWinners ? appreciationSlideBg : participationSlideBg;
+        const dataUrl = await stampCertificate(list[i].name, pos, bgToUse);
         masterDoc.addImage(dataUrl, "JPEG", 0, 0, 297, 210);
       }
 
@@ -422,6 +468,7 @@ export default function CertificatePdfStudioPage() {
 
     try {
       const isWinners = activeTab === "appreciation";
+      const bgToUse = isWinners ? appreciationSlideBg : participationSlideBg;
 
       const masterDoc = new jsPDF({
         orientation: "landscape",
@@ -431,7 +478,8 @@ export default function CertificatePdfStudioPage() {
 
       for (let i = 0; i < targetAttendees.length; i++) {
         if (i > 0) masterDoc.addPage("a4", "landscape");
-        const dataUrl = await stampCertificate(targetAttendees[i].name, templateBg);
+        const pos = getWinnerPosition(targetAttendees[i], winnersObject);
+        const dataUrl = await stampCertificate(targetAttendees[i].name, pos, bgToUse);
         masterDoc.addImage(dataUrl, "JPEG", 0, 0, 297, 210);
       }
 
@@ -547,7 +595,10 @@ export default function CertificatePdfStudioPage() {
           {/* Category Toggle */}
           <div className="bg-[#12101C] p-1.5 rounded-2xl border border-purple-500/30 grid grid-cols-2 gap-2 text-xs font-bold">
             <button
-              onClick={() => setActiveTab("appreciation")}
+              onClick={() => {
+                setActiveTab("appreciation");
+                setPreviewAttendeeIndex(0);
+              }}
               className={`py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition ${
                 activeTab === "appreciation"
                   ? "bg-amber-600 text-white shadow-lg shadow-amber-900/30"
@@ -558,7 +609,10 @@ export default function CertificatePdfStudioPage() {
               <span>Winners ({totalWinnersCount})</span>
             </button>
             <button
-              onClick={() => setActiveTab("participation")}
+              onClick={() => {
+                setActiveTab("participation");
+                setPreviewAttendeeIndex(0);
+              }}
               className={`py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition ${
                 activeTab === "participation"
                   ? "bg-cyan-600 text-white shadow-lg shadow-cyan-900/30"
@@ -570,14 +624,18 @@ export default function CertificatePdfStudioPage() {
             </button>
           </div>
 
-          {/* Single Template Background Card */}
+          {/* Dedicated Template Background Card */}
           <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-5 space-y-3.5 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Upload className="w-4 h-4 text-purple-400" />
-                <span>Certificate Slide Template</span>
+                <span>
+                  {activeTab === "appreciation"
+                    ? "Appreciation Template (Winners)"
+                    : "Participation Template"}
+                </span>
               </h3>
-              {templateBg && (
+              {activeTemplateBg && (
                 <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
                   Loaded
@@ -586,12 +644,16 @@ export default function CertificatePdfStudioPage() {
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed">
-              Upload the slide image saved from PowerPoint (<em>File ➔ Save As ➔ PNG</em>). The system automatically replaces <strong>&lt;&lt;name&gt;&gt;</strong> with each student&apos;s real name.
+              {activeTab === "appreciation"
+                ? "Upload the slide image for Appreciation Certificates. 1st, 2nd, and 3rd place positions and names are dynamically customized for each winner."
+                : "Upload the slide image for Participation Certificates. Each participant's name is dynamically stamped."}
             </p>
 
             <label className="flex items-center justify-center gap-2 p-3.5 rounded-xl border border-dashed border-purple-500/50 hover:border-purple-400 bg-black/40 text-purple-200 text-xs font-bold cursor-pointer transition">
               <Upload className="w-4 h-4 text-purple-400" />
-              <span>Upload Slide Image (.png / .jpg)</span>
+              <span>
+                Upload {activeTab === "appreciation" ? "Appreciation" : "Participation"} Slide Image (.png / .jpg)
+              </span>
               <input
                 type="file"
                 accept="image/png, image/jpeg, image/webp"
@@ -658,11 +720,14 @@ export default function CertificatePdfStudioPage() {
                     onChange={(e) => setPreviewAttendeeIndex(Number(e.target.value))}
                     className="bg-black border border-purple-500/40 text-xs text-white rounded-lg px-2.5 py-1 font-medium focus:outline-none"
                   >
-                    {targetAttendees.map((a, i) => (
-                      <option key={a.uid || a.name} value={i}>
-                        {formatCertificateName(a.name)}
-                      </option>
-                    ))}
+                    {targetAttendees.map((a, i) => {
+                      const pos = getWinnerPosition(a, winnersObject);
+                      return (
+                        <option key={a.uid || a.name} value={i}>
+                          {formatCertificateName(a.name)}{activeTab === "appreciation" ? ` (${pos} Place)` : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               )}
