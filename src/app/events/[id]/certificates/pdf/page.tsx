@@ -221,12 +221,12 @@ export default function CertificatePdfStudioPage() {
       ctx.fillStyle = textGrad;
       ctx.strokeStyle = textGrad;
 
-      // 3. Elegant cursive calligraphy font at 120px
+      // 3. Elegant cursive calligraphy font at 105px
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      let fontSize = 120;
+      let fontSize = 105;
       ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
-      while (ctx.measureText(nameToRender).width > 1250 && fontSize > 70) {
+      while (ctx.measureText(nameToRender).width > 1200 && fontSize > 65) {
         fontSize -= 3;
         ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
       }
@@ -278,7 +278,7 @@ export default function CertificatePdfStudioPage() {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(360, 420, 1200, 134);
 
-        // 2. Draw student's real name in matching gold cursive calligraphy at 120px with 2px stroke
+        // 2. Draw student's real name in matching gold cursive calligraphy at 105px with 2px stroke
         const formatted = formatCertificateName(name);
         const textGrad = ctx.createLinearGradient(960 - 450, 0, 960 + 450, 0);
         textGrad.addColorStop(0, "#CF9F1C");
@@ -289,9 +289,9 @@ export default function CertificatePdfStudioPage() {
 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        let fontSize = 120;
+        let fontSize = 105;
         ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
-        while (ctx.measureText(formatted).width > 1250 && fontSize > 70) {
+        while (ctx.measureText(formatted).width > 1200 && fontSize > 65) {
           fontSize -= 3;
           ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
         }
