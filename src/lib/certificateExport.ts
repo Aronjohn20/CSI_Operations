@@ -1163,10 +1163,10 @@ export async function exportCertificatesZip(
         venue,
         winners
       );
-      zip.file(
-        `All_Certificates_${type === "winners" ? "Winners" : "Participation"}.pptx`,
-        masterPptxBuf
-      );
+      // zip.file(
+      //   `All_Certificates_${type === "winners" ? "Winners" : "Participation"}.pptx`,
+      //   masterPptxBuf
+      // );
     } catch (masterPptxErr) {
       console.warn("Could not generate master multi-slide PPTX for zip:", masterPptxErr);
     }
