@@ -98,8 +98,12 @@ export interface CSIEvent {
     third_place?: string | string[];
   };
   certificate_templates?: {
-    appreciation_template_data?: string; // Base64 data URL
+    appreciation_template_data?: string; // Base64 data URL or preview image
     participation_template_data?: string;
+    appreciation_pptx_url?: string; // Permanent Supabase Storage URL
+    participation_pptx_url?: string;
+    appreciation_filename?: string;
+    participation_filename?: string;
   };
   certificate_writeups?: {
     appreciation_writeup?: string;

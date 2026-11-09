@@ -23,7 +23,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { CSIEvent, FeedbackAttendee } from "@/lib/types";
-import { getEventById, updateEvent } from "@/lib/eventsStorage";
+import { getEventById, updateEvent, uploadCertificateTemplateToSupabase } from "@/lib/eventsStorage";
 import {
   exportCertificatesZip,
   getWinnerPosition,
@@ -113,22 +113,73 @@ export default function CertificateStudioPage() {
         setParticipationTemplate(found.certificate_templates.participation_template_data || "");
       }
 
-      // Restore session PPTX templates if available
-      try {
-        const apprB64 = sessionStorage.getItem(`csi_appr_pptx_${eventId}`);
-        const apprName = sessionStorage.getItem(`csi_appr_pptx_name_${eventId}`) || "appreciation.pptx";
-        if (apprB64) {
-          const u8 = base64ToUint8Array(apprB64);
-          setAppreciationPptxFile({ buffer: u8.buffer as ArrayBuffer, name: apprName });
-        }
-        const partB64 = sessionStorage.getItem(`csi_part_pptx_${eventId}`);
-        const partName = sessionStorage.getItem(`csi_part_pptx_name_${eventId}`) || "participation.pptx";
-        if (partB64) {
-          const u8 = base64ToUint8Array(partB64);
-          setParticipationPptxFile({ buffer: u8.buffer as ArrayBuffer, name: partName });
-        }
-      } catch (err) {
-        console.warn("Could not restore PPTX from session storage:", err);
+      // Restore PPTX templates: first check Supabase permanent Storage Bucket URLs, then session storage
+      if (found.certificate_templates?.appreciation_pptx_url) {
+        fetch(found.certificate_templates.appreciation_pptx_url)
+          .then((res) => {
+            if (!res.ok) throw new Error("Storage template not accessible");
+            return res.arrayBuffer();
+          })
+          .then((buffer) => {
+            setAppreciationPptxFile({
+              buffer,
+              name: found.certificate_templates?.appreciation_filename || "appreciation.pptx",
+            });
+          })
+          .catch((err) => {
+            console.warn("Could not load appreciation PPTX from Supabase bucket:", err);
+            try {
+              const apprB64 = sessionStorage.getItem(`csi_appr_pptx_${eventId}`);
+              const apprName = sessionStorage.getItem(`csi_appr_pptx_name_${eventId}`) || "appreciation.pptx";
+              if (apprB64) {
+                const u8 = base64ToUint8Array(apprB64);
+                setAppreciationPptxFile({ buffer: u8.buffer as ArrayBuffer, name: apprName });
+              }
+            } catch {}
+          });
+      } else {
+        try {
+          const apprB64 = sessionStorage.getItem(`csi_appr_pptx_${eventId}`);
+          const apprName = sessionStorage.getItem(`csi_appr_pptx_name_${eventId}`) || "appreciation.pptx";
+          if (apprB64) {
+            const u8 = base64ToUint8Array(apprB64);
+            setAppreciationPptxFile({ buffer: u8.buffer as ArrayBuffer, name: apprName });
+          }
+        } catch {}
+      }
+
+      if (found.certificate_templates?.participation_pptx_url) {
+        fetch(found.certificate_templates.participation_pptx_url)
+          .then((res) => {
+            if (!res.ok) throw new Error("Storage template not accessible");
+            return res.arrayBuffer();
+          })
+          .then((buffer) => {
+            setParticipationPptxFile({
+              buffer,
+              name: found.certificate_templates?.participation_filename || "participation.pptx",
+            });
+          })
+          .catch((err) => {
+            console.warn("Could not load participation PPTX from Supabase bucket:", err);
+            try {
+              const partB64 = sessionStorage.getItem(`csi_part_pptx_${eventId}`);
+              const partName = sessionStorage.getItem(`csi_part_pptx_name_${eventId}`) || "participation.pptx";
+              if (partB64) {
+                const u8 = base64ToUint8Array(partB64);
+                setParticipationPptxFile({ buffer: u8.buffer as ArrayBuffer, name: partName });
+              }
+            } catch {}
+          });
+      } else {
+        try {
+          const partB64 = sessionStorage.getItem(`csi_part_pptx_${eventId}`);
+          const partName = sessionStorage.getItem(`csi_part_pptx_name_${eventId}`) || "participation.pptx";
+          if (partB64) {
+            const u8 = base64ToUint8Array(partB64);
+            setParticipationPptxFile({ buffer: u8.buffer as ArrayBuffer, name: partName });
+          }
+        } catch {}
       }
 
       if (existingAttendees.length > 0) {
@@ -144,7 +195,8 @@ export default function CertificateStudioPage() {
     newThird: string[],
     newAppTemplate = appreciationTemplate,
     newPartTemplate = participationTemplate,
-    updatedAttendees = attendees
+    updatedAttendees = attendees,
+    extraTemplates?: Partial<CSIEvent["certificate_templates"]>
   ) => {
     if (!event) return;
     const updated: CSIEvent = {
@@ -156,8 +208,10 @@ export default function CertificateStudioPage() {
         third_place: newThird,
       },
       certificate_templates: {
+        ...(event.certificate_templates || {}),
         appreciation_template_data: newAppTemplate,
         participation_template_data: newPartTemplate,
+        ...(extraTemplates || {}),
       },
     };
     setEvent(updated);
@@ -266,6 +320,11 @@ export default function CertificateStudioPage() {
 
     if (isPptx) {
       try {
+        setStatusNotice({
+          type: "success",
+          text: `Processing and uploading PowerPoint template "${file.name}" to Supabase Storage...`,
+        });
+
         const { pptxBuffer, previewImageBase64, fileName } = await extractPptxData(file);
 
         if (type === "appreciation") {
@@ -274,37 +333,45 @@ export default function CertificateStudioPage() {
             sessionStorage.setItem(`csi_appr_pptx_${eventId}`, arrayBufferToBase64(pptxBuffer));
             sessionStorage.setItem(`csi_appr_pptx_name_${eventId}`, fileName);
           } catch {}
-          if (previewImageBase64) {
-            setAppreciationTemplate(previewImageBase64);
-            saveEventChanges(
-              firstPlaceWinners,
-              secondPlaceWinners,
-              thirdPlaceWinners,
-              previewImageBase64,
-              participationTemplate
-            );
-          }
+          if (previewImageBase64) setAppreciationTemplate(previewImageBase64);
         } else {
           setParticipationPptxFile({ buffer: pptxBuffer, name: fileName });
           try {
             sessionStorage.setItem(`csi_part_pptx_${eventId}`, arrayBufferToBase64(pptxBuffer));
             sessionStorage.setItem(`csi_part_pptx_name_${eventId}`, fileName);
           } catch {}
-          if (previewImageBase64) {
-            setParticipationTemplate(previewImageBase64);
-            saveEventChanges(
-              firstPlaceWinners,
-              secondPlaceWinners,
-              thirdPlaceWinners,
-              appreciationTemplate,
-              previewImageBase64
-            );
+          if (previewImageBase64) setParticipationTemplate(previewImageBase64);
+        }
+
+        // Upload directly to Supabase Storage bucket for team-wide access
+        const uploadResult = await uploadCertificateTemplateToSupabase(file, eventId, type, fileName);
+
+        const extra: Partial<CSIEvent["certificate_templates"]> = {};
+        if (uploadResult?.publicUrl) {
+          if (type === "appreciation") {
+            extra.appreciation_pptx_url = uploadResult.publicUrl;
+            extra.appreciation_filename = uploadResult.filename;
+          } else {
+            extra.participation_pptx_url = uploadResult.publicUrl;
+            extra.participation_filename = uploadResult.filename;
           }
         }
 
+        saveEventChanges(
+          firstPlaceWinners,
+          secondPlaceWinners,
+          thirdPlaceWinners,
+          type === "appreciation" ? (previewImageBase64 || appreciationTemplate) : appreciationTemplate,
+          type === "participation" ? (previewImageBase64 || participationTemplate) : participationTemplate,
+          attendees,
+          extra
+        );
+
         setStatusNotice({
           type: "success",
-          text: `PowerPoint template "${fileName}" loaded! Dynamic names & positions will convert to native PDFs via PowerPoint COM.`,
+          text: uploadResult?.publicUrl
+            ? `PowerPoint template "${fileName}" uploaded to Supabase Storage! All associates can now access it.`
+            : `PowerPoint template "${fileName}" loaded locally. (Tip: Ensure 'certificate-templates' bucket is created in Supabase Storage).`,
         });
       } catch (err: any) {
         setStatusNotice({
@@ -317,30 +384,42 @@ export default function CertificateStudioPage() {
 
     if (file.type.startsWith("image/")) {
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         const result = reader.result as string;
         if (type === "appreciation") {
           setAppreciationTemplate(result);
-          saveEventChanges(
-            firstPlaceWinners,
-            secondPlaceWinners,
-            thirdPlaceWinners,
-            result,
-            participationTemplate
-          );
         } else {
           setParticipationTemplate(result);
-          saveEventChanges(
-            firstPlaceWinners,
-            secondPlaceWinners,
-            thirdPlaceWinners,
-            appreciationTemplate,
-            result
-          );
         }
+
+        // Upload image to Supabase Storage
+        const uploadResult = await uploadCertificateTemplateToSupabase(file, eventId, type, file.name);
+        const extra: Partial<CSIEvent["certificate_templates"]> = {};
+        if (uploadResult?.publicUrl) {
+          if (type === "appreciation") {
+            extra.appreciation_pptx_url = uploadResult.publicUrl;
+            extra.appreciation_filename = uploadResult.filename;
+          } else {
+            extra.participation_pptx_url = uploadResult.publicUrl;
+            extra.participation_filename = uploadResult.filename;
+          }
+        }
+
+        saveEventChanges(
+          firstPlaceWinners,
+          secondPlaceWinners,
+          thirdPlaceWinners,
+          type === "appreciation" ? result : appreciationTemplate,
+          type === "participation" ? result : participationTemplate,
+          attendees,
+          extra
+        );
+
         setStatusNotice({
           type: "success",
-          text: `Template image for ${type === "appreciation" ? "Appreciation" : "Participation"} updated successfully!`,
+          text: uploadResult?.publicUrl
+            ? `Template image uploaded to Supabase Storage! Accessible to all associates.`
+            : `Template image updated locally!`,
         });
       };
       reader.readAsDataURL(file);

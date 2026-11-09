@@ -271,6 +271,8 @@ export function saveNewEvent(newEvent: Omit<CSIEvent, "id">): CSIEvent {
           is_feedback_closed: created.is_feedback_closed || false,
           feedback_attendees: created.feedback_attendees || [],
           winners: created.winners || {},
+          certificate_templates: created.certificate_templates || {},
+          certificate_writeups: created.certificate_writeups || {},
         });
 
         // Fallback: If migration script hasn't been run yet, insert baseline columns
@@ -423,6 +425,9 @@ export function updateEvent(updatedEvent: CSIEvent): void {
         if (updatedEvent.is_feedback_closed !== undefined) payload.is_feedback_closed = updatedEvent.is_feedback_closed;
         if (updatedEvent.feedback_attendees !== undefined) payload.feedback_attendees = updatedEvent.feedback_attendees;
         if (updatedEvent.winners !== undefined) payload.winners = updatedEvent.winners;
+        if (updatedEvent.certificate_templates !== undefined) payload.certificate_templates = updatedEvent.certificate_templates;
+        if (updatedEvent.certificate_writeups !== undefined) payload.certificate_writeups = updatedEvent.certificate_writeups;
+        if (updatedEvent.custom_feedback_questions !== undefined) payload.custom_feedback_questions = updatedEvent.custom_feedback_questions;
 
         const { error: upErr } = await supabase
           .from("events")
@@ -442,5 +447,60 @@ export function updateEvent(updatedEvent: CSIEvent): void {
         console.warn("Async Supabase event update failed:", err);
       }
     })();
+  }
+}
+
+export const CERTIFICATE_BUCKET = "certificate-templates";
+
+/**
+ * Uploads a Certificate Template (.pptx, image, or pdf) to Supabase Storage Bucket,
+ * organizing it neatly under the event's unique ID: `certificate-templates/{eventId}/{filename}`.
+ * Returns the permanent public URL accessible to all coordinators and associates.
+ */
+export async function uploadCertificateTemplateToSupabase(
+  file: File | Blob,
+  eventId: string,
+  type: "appreciation" | "participation",
+  originalFilename?: string
+): Promise<{ publicUrl: string; filename: string } | null> {
+  if (!supabase) return null;
+
+  try {
+    const ext = originalFilename
+      ? originalFilename.split(".").pop() || "pptx"
+      : file instanceof File
+      ? file.name.split(".").pop() || "pptx"
+      : "pptx";
+
+    const cleanFilename = `${type}_template_${Date.now()}.${ext}`;
+    const filePath = `${eventId}/${cleanFilename}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from(CERTIFICATE_BUCKET)
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: true,
+      });
+
+    if (uploadErr) {
+      console.warn("Supabase Storage upload warning:", uploadErr.message);
+      // If bucket doesn't exist yet or permission denied, log helpful message
+      if (uploadErr.message?.includes("Bucket not found")) {
+        console.error("Please create a public bucket named 'certificate-templates' in Supabase Dashboard > Storage.");
+      }
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from(CERTIFICATE_BUCKET)
+      .getPublicUrl(filePath);
+
+    return {
+      publicUrl: urlData.publicUrl,
+      filename: originalFilename || (file instanceof File ? file.name : cleanFilename),
+    };
+  } catch (err) {
+    console.warn("Upload certificate template to Supabase failed:", err);
+    return null;
   }
 }
