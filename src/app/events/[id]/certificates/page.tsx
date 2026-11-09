@@ -1001,10 +1001,10 @@ export default function CertificateStudioPage() {
           <Link
             href={`/events/${event.id}/certificates/pdf`}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white text-[15px] font-bold flex items-center gap-2 transition shadow-lg shadow-emerald-900/30 border border-emerald-400/40"
-            title="Convert and export pristine 4K PDFs client-side with zero Linux/Vercel issues"
+            title="Convert and export pristine PDFs client-side with zero Linux/Vercel issues"
           >
             <FileText className="w-4 h-4 text-emerald-200" />
-            <span>High-Res PDF Studio</span>
+            <span>PDF Studio</span>
           </Link>
 
           <button
