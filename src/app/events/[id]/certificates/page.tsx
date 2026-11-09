@@ -21,6 +21,7 @@ import {
   Clipboard,
   ShieldCheck,
   Cloud,
+  Users,
 } from "lucide-react";
 import { CSIEvent, FeedbackAttendee } from "@/lib/types";
 import {
@@ -85,7 +86,7 @@ export default function CertificateStudioPage() {
 
   // Import Responses Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importMethod, setImportMethod] = useState<"file" | "sheet" | "paste">("file");
+  const [importMethod, setImportMethod] = useState<"file" | "sheet" | "paste" | "sample">("file");
   const [importSheetUrl, setImportSheetUrl] = useState("");
   const [importPastedText, setImportPastedText] = useState("");
   const [isImporting, setIsImporting] = useState(false);
@@ -1015,14 +1016,15 @@ export default function CertificateStudioPage() {
             <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
             <span>{isSyncing ? "Syncing..." : "Sync Latest Feedback"}</span>
           </button>
-          {attendees.length === 0 && (
-            <button
-              onClick={handleLoadSampleAttendees}
-              className="px-3.5 py-2.5 rounded-xl bg-purple-900/40 hover:bg-purple-900/70 border border-purple-500/40 text-purple-200 text-[14px] font-bold transition"
-            >
-              Load Sample Attendees
-            </button>
-          )}
+
+          <button
+            onClick={handleLoadSampleAttendees}
+            className="px-3.5 py-2.5 rounded-xl bg-purple-900/40 hover:bg-purple-900/70 border border-purple-500/40 text-purple-200 text-[14px] font-bold transition flex items-center gap-2"
+            title="Load realistic sample CSE attendees for testing"
+          >
+            <Users className="w-4 h-4 text-purple-300" />
+            <span>Load Sample Attendees</span>
+          </button>
         </div>
       </div>
 
@@ -1065,12 +1067,12 @@ export default function CertificateStudioPage() {
             )}
             <div className="text-left">
               <div className="text-lg font-extrabold">
-                {isExportingWinnersZip ? "Converting PPTX to PDF..." : "Download Winners Folder"}
+                {isExportingWinnersZip ? "Generating Winners PPTX..." : "Download Winners Folder (PPTX)"}
               </div>
               <div className="text-xs text-amber-100 font-normal">
                 {isExportingWinnersZip
-                  ? "PowerPoint COM rendering native PDFs..."
-                  : `${totalWinnersCount} Winner(s) (1st, 2nd, 3rd Place)`}
+                  ? "Packaging customized PowerPoint slides into ZIP..."
+                  : `${totalWinnersCount} Winner(s) (Individual & Master .pptx)`}
               </div>
             </div>
           </div>
@@ -1091,12 +1093,12 @@ export default function CertificateStudioPage() {
             )}
             <div className="text-left">
               <div className="text-lg font-extrabold">
-                {isExportingParticipationZip ? "Converting PPTX to PDF..." : "Download Participation Folder"}
+                {isExportingParticipationZip ? "Generating Participation PPTX..." : "Download Participation Folder (PPTX)"}
               </div>
               <div className="text-xs text-cyan-100 font-normal">
                 {isExportingParticipationZip
-                  ? "PowerPoint COM rendering native PDFs..."
-                  : `${totalParticipantsCount} Participant(s)`}
+                  ? "Packaging customized PowerPoint slides into ZIP..."
+                  : `${totalParticipantsCount} Participant(s) (Individual & Master .pptx)`}
               </div>
             </div>
           </div>
@@ -1146,10 +1148,10 @@ export default function CertificateStudioPage() {
               <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
               <div className="min-w-0">
                 <div className="text-sm font-bold text-amber-200 truncate">
-                  Winners Batch Certificate
+                  Winners Batch Presentation (.pptx)
                 </div>
                 <div className="text-xs text-slate-400">
-                  {event.certificate_templates?.winners_pdf_url ? (
+                  {event.certificate_templates?.winners_pptx_url || event.certificate_templates?.winners_pdf_url ? (
                     <span className="text-emerald-400 font-medium">
                       ✓ Ready ({event.certificate_templates.winners_pdf_count || totalWinnersCount} awardees)
                     </span>
@@ -1161,27 +1163,26 @@ export default function CertificateStudioPage() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {event.certificate_templates?.winners_pdf_url && (
-                <a
-                  href={event.certificate_templates.winners_pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-md shadow-amber-900/30"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download PDF</span>
-                </a>
-              )}
               {event.certificate_templates?.winners_pptx_url && (
                 <a
                   href={event.certificate_templates.winners_pptx_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-amber-500/40 hover:bg-amber-950 text-amber-300 text-xs font-semibold flex items-center gap-1 transition"
-                  title="Download multi-slide editable PowerPoint template"
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-md shadow-amber-900/30"
+                  title="Download all winner slides compiled in one PowerPoint presentation"
                 >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>PPTX</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PPTX</span>
+                </a>
+              )}
+              {event.certificate_templates?.winners_pdf_url && (
+                <a
+                  href={event.certificate_templates.winners_pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-amber-500/40 hover:bg-amber-950 text-amber-300 text-xs font-semibold flex items-center gap-1 transition"
+                >
+                  <span>PDF</span>
                 </a>
               )}
             </div>
@@ -1193,10 +1194,10 @@ export default function CertificateStudioPage() {
               <Award className="w-5 h-5 text-cyan-400 shrink-0" />
               <div className="min-w-0">
                 <div className="text-sm font-bold text-cyan-200 truncate">
-                  Participation Batch Certificate
+                  Participation Batch Presentation (.pptx)
                 </div>
                 <div className="text-xs text-slate-400">
-                  {event.certificate_templates?.participation_pdf_url ? (
+                  {event.certificate_templates?.participation_master_pptx_url || event.certificate_templates?.participation_pdf_url ? (
                     <span className="text-emerald-400 font-medium">
                       ✓ Ready ({event.certificate_templates.participation_pdf_count || totalParticipantsCount} participants)
                     </span>
@@ -1208,27 +1209,26 @@ export default function CertificateStudioPage() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {event.certificate_templates?.participation_pdf_url && (
-                <a
-                  href={event.certificate_templates.participation_pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-md shadow-cyan-900/30"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download PDF</span>
-                </a>
-              )}
               {event.certificate_templates?.participation_master_pptx_url && (
                 <a
                   href={event.certificate_templates.participation_master_pptx_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-cyan-500/40 hover:bg-cyan-950 text-cyan-300 text-xs font-semibold flex items-center gap-1 transition"
-                  title="Download multi-slide editable PowerPoint template"
+                  className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-md shadow-cyan-900/30"
+                  title="Download all participant slides compiled in one PowerPoint presentation"
                 >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>PPTX</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PPTX</span>
+                </a>
+              )}
+              {event.certificate_templates?.participation_pdf_url && (
+                <a
+                  href={event.certificate_templates.participation_pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-lg bg-black/60 border border-cyan-500/40 hover:bg-cyan-950 text-cyan-300 text-xs font-semibold flex items-center gap-1 transition"
+                >
+                  <span>PDF</span>
                 </a>
               )}
             </div>
@@ -1492,11 +1492,11 @@ export default function CertificateStudioPage() {
             </div>
 
             {/* Import Method Tabs */}
-            <div className="grid grid-cols-3 gap-2 bg-black p-1 rounded-xl border border-purple-500/30 text-xs font-bold">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-black p-1 rounded-xl border border-purple-500/30 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setImportMethod("file")}
-                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                className={`py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 transition ${
                   importMethod === "file"
                     ? "bg-purple-600 text-white shadow"
                     : "text-slate-400 hover:text-white"
@@ -1508,7 +1508,7 @@ export default function CertificateStudioPage() {
               <button
                 type="button"
                 onClick={() => setImportMethod("sheet")}
-                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                className={`py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 transition ${
                   importMethod === "sheet"
                     ? "bg-purple-600 text-white shadow"
                     : "text-slate-400 hover:text-white"
@@ -1520,7 +1520,7 @@ export default function CertificateStudioPage() {
               <button
                 type="button"
                 onClick={() => setImportMethod("paste")}
-                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                className={`py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 transition ${
                   importMethod === "paste"
                     ? "bg-purple-600 text-white shadow"
                     : "text-slate-400 hover:text-white"
@@ -1528,6 +1528,18 @@ export default function CertificateStudioPage() {
               >
                 <Clipboard className="w-3.5 h-3.5" />
                 <span>Paste Table</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportMethod("sample")}
+                className={`py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                  importMethod === "sample"
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Sample Data</span>
               </button>
             </div>
 
@@ -1604,6 +1616,34 @@ export default function CertificateStudioPage() {
                 >
                   <Clipboard className="w-3.5 h-3.5" />
                   <span>Parse &amp; Import Participants</span>
+                </button>
+              </div>
+            )}
+
+            {/* Tab 4: Sample Attendees */}
+            {importMethod === "sample" && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300">
+                  Instantly populate realistic sample CSE student participants to test certificate generation:
+                </p>
+                <div className="p-4 rounded-xl bg-purple-950/40 border border-purple-500/30 space-y-2 text-xs">
+                  <div className="font-semibold text-purple-200">Includes:</div>
+                  <ul className="text-slate-400 list-disc list-inside space-y-1">
+                    <li>1st, 2nd, and 3rd place winners automatically assigned</li>
+                    <li>Verified student names, UIDs, and emails</li>
+                    <li>Instant generation of individual &amp; master PPTX slides</li>
+                  </ul>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLoadSampleAttendees();
+                    setIsImportModalOpen(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-purple-900/30"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Load Sample Attendees Now</span>
                 </button>
               </div>
             )}
