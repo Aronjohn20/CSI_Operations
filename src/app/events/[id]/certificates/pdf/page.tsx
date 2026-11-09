@@ -221,21 +221,21 @@ export default function CertificatePdfStudioPage() {
       ctx.fillStyle = textGrad;
       ctx.strokeStyle = textGrad;
 
-      // 3. Elegant cursive calligraphy font at 95px
+      // 3. Elegant cursive calligraphy font at 120px
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      let fontSize = 95;
+      let fontSize = 120;
       ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
-      while (ctx.measureText(nameToRender).width > 1200 && fontSize > 60) {
+      while (ctx.measureText(nameToRender).width > 1250 && fontSize > 70) {
         fontSize -= 3;
         ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
       }
 
-      // 4. Subtle gold stroke of 0.5px + fill for pristine razor-sharp calligraphy
+      // 4. Gold stroke of 2px + fill for distinct bold calligraphy
       ctx.lineJoin = "round";
-      ctx.lineWidth = 0.5;
-      ctx.strokeText(nameToRender, 960, 506);
-      ctx.fillText(nameToRender, 960, 506);
+      ctx.lineWidth = 2;
+      ctx.strokeText(nameToRender, 960, 504);
+      ctx.fillText(nameToRender, 960, 504);
     };
 
     if (templateBg) {
@@ -278,7 +278,7 @@ export default function CertificatePdfStudioPage() {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(360, 420, 1200, 134);
 
-        // 2. Draw student's real name in matching gold cursive calligraphy at 95px with 0.5px stroke
+        // 2. Draw student's real name in matching gold cursive calligraphy at 120px with 2px stroke
         const formatted = formatCertificateName(name);
         const textGrad = ctx.createLinearGradient(960 - 450, 0, 960 + 450, 0);
         textGrad.addColorStop(0, "#CF9F1C");
@@ -289,18 +289,18 @@ export default function CertificatePdfStudioPage() {
 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        let fontSize = 95;
+        let fontSize = 120;
         ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
-        while (ctx.measureText(formatted).width > 1200 && fontSize > 60) {
+        while (ctx.measureText(formatted).width > 1250 && fontSize > 70) {
           fontSize -= 3;
           ctx.font = `italic ${fontSize}px "Great Vibes", "Alex Brush", "Allura", "Pinyon Script", "Palace Script MT", cursive`;
         }
 
-        // Subtle gold stroke of 0.5px + fill for pristine razor-sharp calligraphy
+        // Gold stroke of 2px + fill for distinct bold calligraphy
         ctx.lineJoin = "round";
-        ctx.lineWidth = 0.5;
-        ctx.strokeText(formatted, 960, 506);
-        ctx.fillText(formatted, 960, 506);
+        ctx.lineWidth = 2;
+        ctx.strokeText(formatted, 960, 504);
+        ctx.fillText(formatted, 960, 504);
 
         resolve(canvas.toDataURL("image/jpeg", 0.96));
       };
