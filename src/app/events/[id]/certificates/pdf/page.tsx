@@ -59,7 +59,24 @@ export default function CertificatePdfStudioPage() {
 
   // Selected Attendee for Preview
   const [previewAttendeeIndex, setPreviewAttendeeIndex] = useState<number>(0);
+  const [fontLoaded, setFontLoaded] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Load Great Vibes calligraphy font to match the template's <<name>> font
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const fontId = "great-vibes-font";
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement("link");
+      link.id = fontId;
+      link.href = "https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap";
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    if (document.fonts) {
+      document.fonts.ready.then(() => setFontLoaded(true)).catch(() => {});
+    }
+  }, []);
 
   // Load Event
   useEffect(() => {
@@ -194,16 +211,16 @@ export default function CertificatePdfStudioPage() {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(380, 420, 1160, 130);
 
-      // 2. Draw student's name in place of <<name>>
+      // 2. Draw student's name in the exact gold script calligraphy font of <<name>>
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#0f172a";
-      ctx.font = "bold 64px 'Times New Roman', serif";
+      ctx.fillStyle = "#B4833E"; // Warm rich metallic gold matching <<name>>
+      ctx.font = 'italic 76px "Brush Script MT", "Great Vibes", "Edwardian Script ITC", "Lucida Handwriting", "Playfair Display", "Times New Roman", cursive';
       ctx.fillText(nameToRender, 960, 475);
 
-      // 3. Draw clean elegant underline under student name
+      // 3. Draw clean elegant matching gold underline under student name
       const textWidth = ctx.measureText(nameToRender).width;
-      ctx.strokeStyle = "#0f172a";
+      ctx.strokeStyle = "#B4833E";
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(960 - textWidth / 2 - 20, 515);
@@ -220,7 +237,7 @@ export default function CertificatePdfStudioPage() {
     } else {
       renderCanvas();
     }
-  }, [templateBg, currentPreviewAttendee, activeTab]);
+  }, [templateBg, currentPreviewAttendee, activeTab, fontLoaded]);
 
   // Helper to stamp a single certificate on an offscreen canvas and return Data URL
   const stampCertificate = (name: string, bgSrc?: string): Promise<string> => {
@@ -243,17 +260,17 @@ export default function CertificatePdfStudioPage() {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(380, 420, 1160, 130);
 
-        // 2. Draw student's real name
+        // 2. Draw student's real name in matching gold calligraphy script
         const formatted = formatCertificateName(name);
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillStyle = "#0f172a";
-        ctx.font = "bold 64px 'Times New Roman', serif";
+        ctx.fillStyle = "#B4833E"; // Warm rich metallic gold matching <<name>>
+        ctx.font = 'italic 76px "Brush Script MT", "Great Vibes", "Edwardian Script ITC", "Lucida Handwriting", "Playfair Display", "Times New Roman", cursive';
         ctx.fillText(formatted, 960, 475);
 
-        // 3. Draw clean underline
+        // 3. Draw clean matching gold underline
         const textWidth = ctx.measureText(formatted).width;
-        ctx.strokeStyle = "#0f172a";
+        ctx.strokeStyle = "#B4833E";
         ctx.lineWidth = 2.5;
         ctx.beginPath();
         ctx.moveTo(960 - textWidth / 2 - 20, 515);
