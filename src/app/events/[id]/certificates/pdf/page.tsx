@@ -210,22 +210,22 @@ export default function CertificatePdfStudioPage() {
 
       // 1. Cleanly wipe out <<name>> placeholder while leaving the template's underline intact below
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(360, 435, 1200, 115);
+      ctx.fillRect(360, 430, 1200, 122);
 
       // 2. Draw student's name in exact PowerPoint gold gradient
       // Matching OpenXML: pos 0 = #CF9F1C, pos 100000 = #AA8021
-      const textGrad = ctx.createLinearGradient(960 - 280, 0, 960 + 280, 0);
+      const textGrad = ctx.createLinearGradient(960 - 340, 0, 960 + 340, 0);
       textGrad.addColorStop(0, "#CF9F1C");
       textGrad.addColorStop(0.5, "#E8C862");
       textGrad.addColorStop(1, "#AA8021");
       ctx.fillStyle = textGrad;
 
-      // 3. Palace Script MT cursive font stack (NO Times New Roman or generic serif fallback)
+      // 3. Palace Script MT bold cursive font stack
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font =
-        'italic 86px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive';
-      ctx.fillText(nameToRender, 960, 508);
+        'bold italic 106px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive';
+      ctx.fillText(nameToRender, 960, 504);
     };
 
     if (templateBg) {
@@ -266,11 +266,11 @@ export default function CertificatePdfStudioPage() {
 
         // 1. Cleanly wipe out <<name>> placeholder while leaving template underline intact
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(360, 435, 1200, 115);
+        ctx.fillRect(360, 430, 1200, 122);
 
-        // 2. Draw student's real name in matching gold cursive calligraphy
+        // 2. Draw student's real name in matching bold gold cursive calligraphy
         const formatted = formatCertificateName(name);
-        const textGrad = ctx.createLinearGradient(960 - 280, 0, 960 + 280, 0);
+        const textGrad = ctx.createLinearGradient(960 - 340, 0, 960 + 340, 0);
         textGrad.addColorStop(0, "#CF9F1C");
         textGrad.addColorStop(0.5, "#E8C862");
         textGrad.addColorStop(1, "#AA8021");
@@ -279,8 +279,8 @@ export default function CertificatePdfStudioPage() {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.font =
-          'italic 86px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive';
-        ctx.fillText(formatted, 960, 508);
+          'bold italic 106px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive';
+        ctx.fillText(formatted, 960, 504);
 
         resolve(canvas.toDataURL("image/jpeg", 0.96));
       };
