@@ -12,7 +12,6 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
-  Eye,
   RotateCcw,
   X,
   FileCode,
@@ -41,6 +40,7 @@ import {
   arrayBufferToBase64,
   base64ToUint8Array,
   generateBatchCertificatesBlob,
+  generateBatchCertificatesBlobFromPptx,
 } from "@/lib/certificateExport";
 import {
   mapGoogleSheetToFeedbackAttendees,
@@ -79,15 +79,9 @@ export default function CertificateStudioPage() {
     name: string;
   } | null>(null);
 
-  // Preview Templates (Base64 data URLs extracted from PPTX or images)
+  // Stored Templates (Base64 data URLs extracted from PPTX or images)
   const [appreciationTemplate, setAppreciationTemplate] = useState<string>("");
   const [participationTemplate, setParticipationTemplate] = useState<string>("");
-
-  // Live Preview Controls
-  const [previewTab, setPreviewTab] = useState<"appreciation" | "participation">("appreciation");
-  const [selectedPreviewUid, setSelectedPreviewUid] = useState<string>("");
-  const [liveSlidePreview, setLiveSlidePreview] = useState<string>("");
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   // Import Responses Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -222,10 +216,6 @@ export default function CertificateStudioPage() {
           }
         } catch {}
       }
-
-      if (existingAttendees.length > 0) {
-        setSelectedPreviewUid(existingAttendees[0].uid || existingAttendees[0].name);
-      }
     }
     setLoading(false);
   }, [eventId]);
@@ -311,9 +301,6 @@ export default function CertificateStudioPage() {
         type: "success",
         text: `Successfully synced ${mapped.length} verified participant(s) from your Google Sheet!`,
       });
-      if (!selectedPreviewUid && mapped.length > 0) {
-        setSelectedPreviewUid(mapped[0].uid || mapped[0].name);
-      }
     } catch (err: any) {
       setStatusNotice({
         type: "error",
@@ -341,9 +328,6 @@ export default function CertificateStudioPage() {
       type: "success",
       text: `Loaded ${sample.length} sample participants with verified names!`,
     });
-    if (sample.length > 0) {
-      setSelectedPreviewUid(sample[0].uid || sample[0].name);
-    }
   };
 
   // Template Upload Handler - Supports .pptx (PowerPoint) and image files
@@ -367,7 +351,6 @@ export default function CertificateStudioPage() {
         });
 
         const { pptxBuffer, previewImageBase64, fileName } = await extractPptxData(file);
-        setLiveSlidePreview("");
 
         if (type === "appreciation") {
           setAppreciationPptxFile({ buffer: pptxBuffer, name: fileName });
@@ -504,96 +487,6 @@ export default function CertificateStudioPage() {
     };
   }, [firstPlaceWinners, secondPlaceWinners, thirdPlaceWinners]);
 
-  // Currently Previewed Attendee - defaults to a sample participant if feedback responses aren't imported yet
-  const currentPreviewAttendee = useMemo(() => {
-    if (!attendees || attendees.length === 0) {
-      return {
-        name: "LEYAH MARY THOMAS",
-        uid: "sample_preview",
-        email: "participant@csi.rset.edu",
-      } as FeedbackAttendee;
-    }
-    const found = attendees.find(
-      (a) => (a.uid && a.uid === selectedPreviewUid) || a.name === selectedPreviewUid
-    );
-    return found || attendees[0];
-  }, [attendees, selectedPreviewUid]);
-
-  // Generate real PowerPoint slide preview with dynamic participant name & event write-up
-  useEffect(() => {
-    const activePptx = previewTab === "appreciation" ? appreciationPptxFile : participationPptxFile;
-    if (!activePptx?.buffer || !currentPreviewAttendee) {
-      setLiveSlidePreview("");
-      return;
-    }
-
-    let isCancelled = false;
-    const generatePreview = async () => {
-      setIsPreviewLoading(true);
-      try {
-        const rawPos = getWinnerPosition(currentPreviewAttendee, winnersObject);
-        const pos = previewTab === "appreciation"
-          ? (rawPos === "participant" ? "1st" : rawPos)
-          : "participant";
-        const formattedName = formatCertificateName(currentPreviewAttendee.name);
-        const customizedPptx = await createPptxWithName(activePptx.buffer, formattedName, pos, event || undefined);
-        const b64 = arrayBufferToBase64(customizedPptx);
-
-        const res = await fetch("/api/convert-pptx", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "preview",
-            pptxBase64: b64,
-          }),
-        });
-
-        const data = await res.json();
-        if (!isCancelled && data.success && data.previewImage) {
-          const img = new Image();
-          img.onload = () => {
-            if (!isCancelled) {
-              if (img.width > 0 && img.height > 0 && img.width / img.height >= 1.2) {
-                setLiveSlidePreview(data.previewImage);
-              } else {
-                setLiveSlidePreview("");
-              }
-            }
-          };
-          img.onerror = () => {
-            if (!isCancelled) setLiveSlidePreview("");
-          };
-          img.src = data.previewImage;
-        } else if (!isCancelled) {
-          setLiveSlidePreview("");
-        }
-      } catch (err) {
-        console.warn("Could not generate live slide preview:", err);
-      } finally {
-        if (!isCancelled) setIsPreviewLoading(false);
-      }
-    };
-
-    const timeout = setTimeout(generatePreview, 200);
-    return () => {
-      isCancelled = true;
-      clearTimeout(timeout);
-    };
-  }, [
-    currentPreviewAttendee?.uid,
-    currentPreviewAttendee?.name,
-    previewTab,
-    appreciationPptxFile,
-    participationPptxFile,
-    firstPlaceWinners,
-    secondPlaceWinners,
-    thirdPlaceWinners,
-    winnersObject,
-    event?.event_name,
-    event?.event_date,
-    event?.mode,
-  ]);
-
   // Handle Import File (.xlsx, .xls, .csv, .tsv)
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -637,9 +530,6 @@ export default function CertificateStudioPage() {
         type: "success",
         text: `Successfully imported ${mapped.length} verified participant(s) from "${file.name}"!`,
       });
-      if (mapped.length > 0) {
-        setSelectedPreviewUid(mapped[0].uid || mapped[0].name);
-      }
       setIsImportModalOpen(false);
     } catch (err: any) {
       alert("Import failed: " + (err.message || "Invalid file format"));
@@ -697,9 +587,6 @@ export default function CertificateStudioPage() {
         type: "success",
         text: `Successfully connected & imported ${mapped.length} participant(s) from Google Sheet!`,
       });
-      if (mapped.length > 0) {
-        setSelectedPreviewUid(mapped[0].uid || mapped[0].name);
-      }
       setIsImportModalOpen(false);
       setImportSheetUrl("");
     } catch (err: any) {
@@ -737,9 +624,6 @@ export default function CertificateStudioPage() {
         type: "success",
         text: `Successfully imported ${mapped.length} participant(s) from pasted data!`,
       });
-      if (mapped.length > 0) {
-        setSelectedPreviewUid(mapped[0].uid || mapped[0].name);
-      }
       setIsImportModalOpen(false);
       setImportPastedText("");
     } catch (err: any) {
@@ -774,12 +658,13 @@ export default function CertificateStudioPage() {
 
       if (winnersAttendees.length > 0) {
         try {
-          const pdfBlob = generateBatchCertificatesBlob(
+          const pdfBlob = await generateBatchCertificatesBlobFromPptx(
             winnersAttendees,
             event.event_name,
             event.event_date,
             event.venue,
             winnersObject,
+            appreciationPptxFile?.buffer,
             appreciationTemplate || undefined,
             event.faculty_in_charge
           );
@@ -867,12 +752,13 @@ export default function CertificateStudioPage() {
 
       if (partAttendees.length > 0) {
         try {
-          const pdfBlob = generateBatchCertificatesBlob(
+          const pdfBlob = await generateBatchCertificatesBlobFromPptx(
             partAttendees,
             event.event_name,
             event.event_date,
             event.venue,
             winnersObject,
+            participationPptxFile?.buffer,
             participationTemplate || undefined,
             event.faculty_in_charge
           );
@@ -954,12 +840,13 @@ export default function CertificateStudioPage() {
       };
 
       if (winnersAttendees.length > 0) {
-        const winBlob = generateBatchCertificatesBlob(
+        const winBlob = await generateBatchCertificatesBlobFromPptx(
           winnersAttendees,
           event.event_name,
           event.event_date,
           event.venue,
           winnersObject,
+          appreciationPptxFile?.buffer,
           appreciationTemplate || undefined,
           event.faculty_in_charge
         );
@@ -991,12 +878,13 @@ export default function CertificateStudioPage() {
       }
 
       if (partAttendees.length > 0) {
-        const partBlob = generateBatchCertificatesBlob(
+        const partBlob = await generateBatchCertificatesBlobFromPptx(
           partAttendees,
           event.event_name,
           event.event_date,
           event.venue,
           winnersObject,
+          participationPptxFile?.buffer,
           participationTemplate || undefined,
           event.faculty_in_charge
         );
@@ -1475,7 +1363,6 @@ export default function CertificateStudioPage() {
                 onClick={() => {
                   setAppreciationTemplate("");
                   setAppreciationPptxFile(null);
-                  setLiveSlidePreview("");
                   try {
                     sessionStorage.removeItem(`csi_appr_pptx_${eventId}`);
                     sessionStorage.removeItem(`csi_appr_pptx_name_${eventId}`);
@@ -1537,7 +1424,6 @@ export default function CertificateStudioPage() {
                 onClick={() => {
                   setParticipationTemplate("");
                   setParticipationPptxFile(null);
-                  setLiveSlidePreview("");
                   try {
                     sessionStorage.removeItem(`csi_part_pptx_${eventId}`);
                     sessionStorage.removeItem(`csi_part_pptx_name_${eventId}`);
@@ -1587,194 +1473,6 @@ export default function CertificateStudioPage() {
           </label>
         </div>
       </div>
-
-      {/* CERTIFICATE PREVIEW */}
-      <div className="bg-[#12101C] rounded-2xl border border-purple-500/30 p-6 space-y-4 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/20 pb-3">
-          <div className="flex items-center gap-2">
-            <Eye className="w-5 h-5 text-purple-400" />
-            <h2 className="text-lg font-bold text-white">Certificate Preview</h2>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Toggle Preview Template */}
-            <div className="flex rounded-xl bg-black p-1 border border-purple-500/30 text-xs font-bold">
-              <button
-                onClick={() => setPreviewTab("appreciation")}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  previewTab === "appreciation"
-                    ? "bg-amber-600 text-white shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Appreciation (Winner)
-              </button>
-              <button
-                onClick={() => setPreviewTab("participation")}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  previewTab === "participation"
-                    ? "bg-cyan-600 text-white shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Participation
-              </button>
-            </div>
-
-            {/* Select Participant to Preview */}
-            {attendees.length > 0 && (
-              <select
-                value={selectedPreviewUid}
-                onChange={(e) => setSelectedPreviewUid(e.target.value)}
-                className="bg-black border border-purple-500/40 text-xs text-white rounded-xl px-3 py-1.5 font-medium focus:outline-none"
-              >
-                {attendees.map((a) => (
-                  <option key={a.uid || a.name} value={a.uid || a.name}>
-                    {formatCertificateName(a.name)}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-
-        {/* Visual Certificate Canvas */}
-        <div className="bg-slate-950 p-4 sm:p-6 rounded-2xl border border-purple-500/30 flex items-center justify-center overflow-x-auto shadow-inner relative min-h-[350px]">
-          {isPreviewLoading && (
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/85 border border-purple-500/40 text-purple-200 text-xs font-semibold backdrop-blur-md shadow-lg animate-pulse">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-400" />
-              <span>Rendering Preview...</span>
-            </div>
-          )}
-
-          {/* 1. Real PowerPoint slide preview image with exact student name and placement */}
-          {liveSlidePreview ? (
-            <div className="w-[850px] max-w-full rounded-xl overflow-hidden shadow-2xl border border-purple-500/30 bg-black flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={liveSlidePreview}
-                alt="Certificate Live Preview"
-                className="w-full h-auto object-contain rounded-lg"
-              />
-            </div>
-          ) : (previewTab === "appreciation" ? appreciationTemplate : participationTemplate) ? (
-            /* 2. Custom Template Background with Live Dynamic Name & Write-up stamped on top */
-            <div className="w-[850px] max-w-full rounded-xl overflow-hidden shadow-2xl border border-purple-500/30 bg-black flex items-center justify-center relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewTab === "appreciation" ? appreciationTemplate : participationTemplate}
-                alt="Certificate Template Preview"
-                className="w-full h-auto object-contain rounded-lg block"
-              />
-              {/* Clean White Overlay covering the template's placeholder area */}
-              <div
-                className="absolute inset-x-[12%] top-[45%] bottom-[23%] bg-white flex flex-col items-center justify-center text-center px-4 z-10 pointer-events-none"
-                style={{ fontFamily: "'Times New Roman', Times, serif" }}
-              >
-                <div className="text-xl sm:text-2xl font-bold italic text-slate-900 border-b border-amber-600 pb-0.5 mb-1.5">
-                  {currentPreviewAttendee ? formatCertificateName(currentPreviewAttendee.name) : "PARTICIPANT NAME"}
-                </div>
-                <p className="text-[10px] sm:text-[11px] text-slate-800 leading-snug max-w-lg">
-                  {previewTab === "appreciation" ? (
-                    <>
-                      has secured <strong className="font-extrabold text-black">1st place</strong> in the {event?.mode?.toLowerCase() || "offline"} Intra-College technical event titled <strong className="font-extrabold text-black">&quot;{event?.event_name}&quot;</strong>, held on <strong className="font-extrabold text-black">{formatDayFirstOrdinalDate(event?.event_date || "")}</strong>, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.
-                    </>
-                  ) : (
-                    <>
-                      has actively participated in the {event?.mode?.toLowerCase() || "offline"} Intra-College technical event titled <strong className="font-extrabold text-black">&quot;{event?.event_name}&quot;</strong>, held on <strong className="font-extrabold text-black">{formatDayFirstOrdinalDate(event?.event_date || "")}</strong>, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
-          ) : (
-            // Default template layout when no custom image or PPTX is uploaded
-            <div className="w-[850px] h-[600px] shrink-0 bg-white text-black rounded-lg shadow-2xl relative flex flex-col justify-between overflow-hidden p-8" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
-              <div className="absolute inset-3 border-[3px] border-[#18122B] pointer-events-none">
-                <div className="absolute inset-1.5 border border-[#D97706]" />
-              </div>
-
-                {/* Default Header */}
-                <div className="relative z-10 flex items-center justify-between pt-2 px-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/logos/rset_logo.png"
-                    alt="RSET Logo"
-                    className="h-14 w-auto object-contain"
-                  />
-                  <div className="text-center space-y-0.5">
-                    <h3 className="font-bold text-[16px] text-[#18122B] tracking-wide">
-                      RAJAGIRI SCHOOL OF ENGINEERING &amp; TECHNOLOGY (AUTONOMOUS)
-                    </h3>
-                    <h4 className="font-bold text-[12px] text-[#50466E] tracking-wider">
-                      COMPUTER SOCIETY OF INDIA STUDENT BRANCH - RSET
-                    </h4>
-                  </div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/logos/csi_logo.png"
-                    alt="CSI Logo"
-                    className="h-12 w-12 object-contain"
-                  />
-                </div>
-
-                {/* Default Title */}
-                <div className="relative z-10 text-center">
-                  <h2
-                    className={`text-2xl font-extrabold tracking-widest uppercase ${
-                      previewTab === "appreciation" ? "text-amber-700" : "text-[#18122B]"
-                    }`}
-                  >
-                    {previewTab === "appreciation"
-                      ? "CERTIFICATE OF APPRECIATION"
-                      : "CERTIFICATE OF PARTICIPATION"}
-                  </h2>
-                  <div className="w-28 h-0.5 bg-amber-600 mx-auto mt-1.5" />
-                </div>
-
-                {/* Dynamic Formatted Name */}
-                <div className="relative z-10 text-center space-y-2 px-8">
-                  <p className="italic text-slate-700 text-sm">This is to proudly certify that</p>
-                  <h1 className="text-3xl font-extrabold text-slate-900 tracking-wide uppercase">
-                    {currentPreviewAttendee
-                      ? formatCertificateName(currentPreviewAttendee.name)
-                      : "PARTICIPANT NAME"}
-                  </h1>
-                  <p className="text-slate-800 text-xs max-w-xl mx-auto pt-1 leading-relaxed">
-                    {previewTab === "appreciation" ? (
-                      <>
-                        has secured <strong className="font-extrabold text-black">1st place</strong> in the {event.mode?.toLowerCase() || "offline"} event titled <strong className="font-extrabold text-black">&quot;{event.event_name}&quot;</strong> held on <strong className="font-extrabold text-black">{formatDayFirstOrdinalDate(event.event_date)}</strong>, organized by the Computer Society of India (CSI) Student Branch, RSET.
-                      </>
-                    ) : (
-                      <>
-                        has actively participated in the {event.mode?.toLowerCase() || "offline"} event titled <strong className="font-extrabold text-black">&quot;{event.event_name}&quot;</strong> held on <strong className="font-extrabold text-black">{formatDayFirstOrdinalDate(event.event_date)}</strong>, organized by the Computer Society of India (CSI) Student Branch, RSET.
-                      </>
-                    )}
-                  </p>
-                </div>
-
-                {/* Default Signatures */}
-                <div className="relative z-10 flex items-end justify-between px-8 pb-2 text-center text-[11px]">
-                  <div className="space-y-0.5">
-                    <div className="w-28 border-b border-slate-400 mb-1" />
-                    <p className="font-bold text-slate-900">Dr. Neeba E A</p>
-                    <p className="text-[10px] text-slate-600">Branch Counselor</p>
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="w-28 border-b border-slate-400 mb-1" />
-                    <p className="font-bold text-slate-900">{event.faculty_in_charge || "Dr. Tripti C"}</p>
-                    <p className="text-[10px] text-slate-600">Faculty Coordinator</p>
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="w-28 border-b border-slate-400 mb-1" />
-                    <p className="font-bold text-slate-900">Student Chair</p>
-                    <p className="text-[10px] text-slate-600">CSI SB RSET</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
 
       {/* IMPORT RESPONSES MODAL */}
       {isImportModalOpen && (

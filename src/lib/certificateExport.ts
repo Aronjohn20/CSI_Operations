@@ -554,17 +554,10 @@ export async function createMultiSlidePptx(
     if (splitRegex.test(customizedXml)) {
       customizedXml = customizedXml.replace(splitRegex, formattedName);
     }
-    customizedXml = replacePositionInSlideXml(customizedXml, pos);
-    customizedXml = replaceWriteupInSlideXml(
-      customizedXml,
-      {
-        event_name: eventName,
-        event_date: eventDate,
-        venue: venue,
-        mode: venue.toLowerCase().includes("online") ? "Online" : "Offline",
-      },
-      pos
-    );
+    // Only replace position placeholders if position is winner
+    if (pos && pos !== "participant") {
+      customizedXml = replacePositionInSlideXml(customizedXml, pos);
+    }
 
     if (slideNum === 1) {
       zip.file("ppt/slides/slide1.xml", customizedXml);
@@ -637,12 +630,9 @@ export async function createPptxWithName(
       xml = xml.replace(splitRegex, replacementName);
     }
 
-    // Replace placement position (1st, 2nd, 3rd)
-    xml = replacePositionInSlideXml(xml, position);
-
-    // Dynamically replace event details in writeup
-    if (event) {
-      xml = replaceWriteupInSlideXml(xml, event, position);
+    // Replace placement position placeholder if specified
+    if (position && position !== "participant") {
+      xml = replacePositionInSlideXml(xml, position);
     }
 
     zip.file(slidePath, xml);
@@ -1032,6 +1022,85 @@ export function generateBatchCertificatesBlob(
 }
 
 /**
+ * Compiles a batch of certificates into a PDF Blob directly in the browser.
+ * If a PPTX template is provided, each attendee's slide is generated in memory
+ * and converted to PDF using client-side canvas rendering (100% Linux/Vercel compatible).
+ */
+export async function generateBatchCertificatesBlobFromPptx(
+  attendees: FeedbackAttendee[],
+  eventName: string,
+  eventDate: string,
+  venue: string,
+  winners?: {
+    first_place?: string | string[];
+    second_place?: string | string[];
+    third_place?: string | string[];
+  },
+  templatePptxBuffer?: ArrayBuffer,
+  templateImage?: string,
+  facultyCoordinator?: string
+): Promise<Blob> {
+  if (!templatePptxBuffer) {
+    return generateBatchCertificatesBlob(
+      attendees,
+      eventName,
+      eventDate,
+      venue,
+      winners,
+      templateImage,
+      facultyCoordinator
+    );
+  }
+
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4",
+  });
+
+  for (let i = 0; i < attendees.length; i++) {
+    const att = attendees[i];
+    const pos = getWinnerPosition(att, winners);
+    const formattedName = formatCertificateName(att.name);
+
+    if (i > 0) {
+      doc.addPage("a4", "landscape");
+    }
+
+    let rendered = false;
+    try {
+      const singlePptx = await createPptxWithName(templatePptxBuffer, formattedName, pos);
+      const slideImg = await renderPptxSlideToDataUrl(singlePptx);
+      if (slideImg) {
+        doc.addImage(slideImg, "JPEG", 0, 0, 297, 210);
+        rendered = true;
+      }
+    } catch (err) {
+      console.warn("Client canvas render failed for batch page:", err);
+    }
+
+    if (!rendered) {
+      renderCertificatePage(
+        doc,
+        {
+          attendee: att,
+          eventName,
+          eventDate,
+          venue,
+          position: pos,
+          facultyCoordinator,
+          templateImage,
+        },
+        i,
+        attendees.length
+      );
+    }
+  }
+
+  return doc.output("blob");
+}
+
+/**
  * Batch exports certificates into two separate ZIP folders (Winners Appreciation vs Participation)
  * Matches the user's exact Python workflow:
  * - Replaces <<name>> and position (1st, 2nd, 3rd) in the PowerPoint PPTX
@@ -1071,7 +1140,7 @@ export async function exportCertificatesZip(
     );
   }
 
-  // If a PowerPoint template was uploaded, customize PPTX and convert via PowerPoint COM
+  // If a PowerPoint template was uploaded, customize PPTX and convert via PowerPoint COM or client-side Canvas
   if (templatePptxBuffer) {
     const pptxItems: {
       name: string;
@@ -1086,13 +1155,11 @@ export async function exportCertificatesZip(
       const formattedName = formatCertificateName(att.name);
       const safeName = formattedName.replace(/[^a-zA-Z0-9_ -]/g, "").trim();
 
-      const pptxData = await createPptxWithName(templatePptxBuffer, formattedName, pos, {
-        event_name: eventName,
-        event_date: eventDate,
-        venue: venue,
-        mode: venue.toLowerCase().includes("online") || venue.toLowerCase().includes("hackerrank") ? "Online" : "Offline",
-      });
+      const pptxData = await createPptxWithName(templatePptxBuffer, formattedName, pos);
       const b64 = arrayBufferToBase64(pptxData);
+
+      // Add individual PPTX to the zip archive
+      zip.file(`${safeName}.pptx`, pptxData);
 
       pptxItems.push({
         name: safeName,
@@ -1103,7 +1170,25 @@ export async function exportCertificatesZip(
       });
     }
 
-    // Call PowerPoint COM API to convert customized PPTX files directly into native PDFs
+    // Add Master Multi-Slide PPTX with all participants into the zip
+    try {
+      const masterPptxBuf = await createMultiSlidePptx(
+        templatePptxBuffer,
+        targetAttendees,
+        eventName,
+        eventDate,
+        venue,
+        winners
+      );
+      zip.file(
+        `All_Certificates_${type === "winners" ? "Winners" : "Participation"}.pptx`,
+        masterPptxBuf
+      );
+    } catch (masterPptxErr) {
+      console.warn("Could not generate master multi-slide PPTX for zip:", masterPptxErr);
+    }
+
+    // Call PowerPoint COM API to convert customized PPTX files directly into native PDFs if on Windows
     let convertedPdfs: Record<string, string> = {};
     try {
       const res = await fetch("/api/convert-pptx", {
@@ -1119,46 +1204,82 @@ export async function exportCertificatesZip(
       });
 
       const data = await res.json();
-      if (data.success && data.pdfs) {
+      if (data.success && data.pdfs && Object.keys(data.pdfs).length > 0) {
         convertedPdfs = data.pdfs;
-      } else {
-        console.warn("PowerPoint batch conversion returned error:", data.error);
       }
     } catch (apiErr) {
-      console.warn("Could not reach /api/convert-pptx, falling back to client PDF:", apiErr);
+      console.warn("PowerPoint COM not available, falling back to client-side canvas PDF:", apiErr);
     }
 
-    // For each item, add the converted native PDF (or fallback to jsPDF)
+    // For each item, add the converted native PDF (or render client-side via canvas into jsPDF)
     for (const item of pptxItems) {
       if (convertedPdfs[item.name]) {
         const pdfBytes = base64ToUint8Array(convertedPdfs[item.name]);
         zip.file(`${item.name}.pdf`, pdfBytes);
       } else {
-        // Fallback: jsPDF
-        const doc = new jsPDF({
-          orientation: "landscape",
-          unit: "mm",
-          format: "a4",
-        });
+        // Pure Client-Side PPTX to Canvas Rendering (works identically on Vercel Linux & Windows)
+        let slideImg: string | null = null;
+        try {
+          slideImg = await renderPptxSlideToDataUrl(item.pptxBuffer);
+        } catch (canvasErr) {
+          console.warn(`Canvas render failed for ${item.name}:`, canvasErr);
+        }
 
-        renderCertificatePage(
-          doc,
-          {
-            attendee: item.attendee,
-            eventName,
-            eventDate,
-            venue,
-            position: item.position,
-            facultyCoordinator,
-            templateImage,
-          },
-          0,
-          1
-        );
+        if (slideImg) {
+          const doc = new jsPDF({
+            orientation: "landscape",
+            unit: "mm",
+            format: "a4",
+          });
+          doc.addImage(slideImg, "JPEG", 0, 0, 297, 210);
+          zip.file(`${item.name}.pdf`, doc.output("arraybuffer"));
+        } else {
+          // Fallback: jsPDF vector certificate
+          const doc = new jsPDF({
+            orientation: "landscape",
+            unit: "mm",
+            format: "a4",
+          });
 
-        const fallbackPdf = doc.output("arraybuffer");
-        zip.file(`${item.name}.pdf`, fallbackPdf);
+          renderCertificatePage(
+            doc,
+            {
+              attendee: item.attendee,
+              eventName,
+              eventDate,
+              venue,
+              position: item.position,
+              facultyCoordinator,
+              templateImage,
+            },
+            0,
+            1
+          );
+
+          const fallbackPdf = doc.output("arraybuffer");
+          zip.file(`${item.name}.pdf`, fallbackPdf);
+        }
       }
+    }
+
+    // Also add Master Multi-Page PDF with all participants into the zip
+    try {
+      const masterPdfBlob = await generateBatchCertificatesBlobFromPptx(
+        targetAttendees,
+        eventName,
+        eventDate,
+        venue,
+        winners,
+        templatePptxBuffer,
+        templateImage,
+        facultyCoordinator
+      );
+      zip.file(
+        `All_Certificates_${type === "winners" ? "Winners" : "Participation"}.pdf`,
+        await masterPdfBlob.arrayBuffer()
+      );
+    } catch (masterPdfErr) {
+      console.warn("Could not generate master multi-page PDF for zip:", masterPdfErr);
     }
   } else {
     // Default Official CSI SB RSET Vector Certificate (when no custom PPTX is uploaded)
