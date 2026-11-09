@@ -1658,14 +1658,34 @@ export default function CertificateStudioPage() {
               />
             </div>
           ) : (previewTab === "appreciation" ? appreciationTemplate : participationTemplate) ? (
-            /* 2. Fallback if preview is loading or template image is uploaded */
-            <div className="w-[850px] max-w-full rounded-xl overflow-hidden shadow-2xl border border-purple-500/30 bg-black flex items-center justify-center">
+            /* 2. Custom Template Background with Live Dynamic Name & Write-up stamped on top */
+            <div className="w-[850px] max-w-full rounded-xl overflow-hidden shadow-2xl border border-purple-500/30 bg-black flex items-center justify-center relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewTab === "appreciation" ? appreciationTemplate : participationTemplate}
                 alt="Certificate Template Preview"
-                className="w-full h-auto object-contain rounded-lg"
+                className="w-full h-auto object-contain rounded-lg block"
               />
+              {/* Clean White Overlay covering the template's placeholder area */}
+              <div
+                className="absolute inset-x-[12%] top-[45%] bottom-[23%] bg-white flex flex-col items-center justify-center text-center px-4 z-10 pointer-events-none"
+                style={{ fontFamily: "'Times New Roman', Times, serif" }}
+              >
+                <div className="text-xl sm:text-2xl font-bold italic text-slate-900 border-b border-amber-600 pb-0.5 mb-1.5">
+                  {currentPreviewAttendee ? formatCertificateName(currentPreviewAttendee.name) : "PARTICIPANT NAME"}
+                </div>
+                <p className="text-[10px] sm:text-[11px] text-slate-800 leading-snug max-w-lg">
+                  {previewTab === "appreciation" ? (
+                    <>
+                      has secured <strong className="font-extrabold text-black">1st place</strong> in the {event?.mode?.toLowerCase() || "offline"} Intra-College technical event titled <strong className="font-extrabold text-black">&quot;{event?.event_name}&quot;</strong>, held on <strong className="font-extrabold text-black">{formatDayFirstOrdinalDate(event?.event_date || "")}</strong>, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.
+                    </>
+                  ) : (
+                    <>
+                      has actively participated in the {event?.mode?.toLowerCase() || "offline"} Intra-College technical event titled <strong className="font-extrabold text-black">&quot;{event?.event_name}&quot;</strong>, held on <strong className="font-extrabold text-black">{formatDayFirstOrdinalDate(event?.event_date || "")}</strong>, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
           ) : (
             // Default template layout when no custom image or PPTX is uploaded
