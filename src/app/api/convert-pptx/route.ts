@@ -8,45 +8,8 @@ import JSZip from "jszip";
 
 const execAsync = promisify(exec);
 
-// Helper to extract the largest slide image from a PPTX buffer using JSZip
-async function extractImageFromPptx(buffer: Buffer): Promise<string | null> {
-  try {
-    const zip = await JSZip.loadAsync(buffer);
-    const mediaFiles = Object.keys(zip.files).filter(
-      (f) => f.startsWith("ppt/media/") && !zip.files[f].dir
-    );
-
-    let maxLen = 0;
-    let candidateData: string | null = null;
-    let candidateExt = "jpeg";
-
-    for (const m of mediaFiles) {
-      const lower = m.toLowerCase();
-      if (
-        lower.endsWith(".png") ||
-        lower.endsWith(".jpg") ||
-        lower.endsWith(".jpeg") ||
-        lower.endsWith(".webp")
-      ) {
-        const data = await zip.files[m].async("base64");
-        if (data.length > maxLen) {
-          maxLen = data.length;
-          candidateExt = lower.endsWith(".png") ? "png" : "jpeg";
-          candidateData = data;
-        }
-      }
-    }
-
-    if (candidateData) {
-      return `data:image/${candidateExt};base64,${candidateData}`;
-    }
-    return null;
-  } catch (err) {
-    console.warn("Server-side PPTX zip image extraction failed:", err);
-    return null;
-  }
-}
-
+// On Windows, native PowerPoint COM can be used for exact slide typography rendering.
+// On Linux (Vercel), we cleanly signal fallbackToVector so client-side vector certificates render.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -66,60 +29,56 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const pptxBuffer = Buffer.from(pptxBase64, "base64");
-
-      // 1. Try server-side JSZip media extraction (platform independent, works on Vercel)
-      const zipImage = await extractImageFromPptx(pptxBuffer);
-
-      // 2. If on Windows, try native PowerPoint COM for exact slide typography rendering
       const isWindows = process.platform === "win32";
-      if (isWindows) {
-        fs.mkdirSync(tmpDir, { recursive: true });
-        const inputPptx = path.join(tmpDir, "template.pptx");
-        const outputJpg = path.join(tmpDir, "preview.jpg");
-        fs.writeFileSync(inputPptx, pptxBuffer);
-
-        const psScript = `
-          try {
-            $ppt = New-Object -ComObject PowerPoint.Application
-            $pres = $ppt.Presentations.Open('${inputPptx.replace(/'/g, "''")}', -1, 0, 0)
-            $slide = $pres.Slides.Item(1)
-            $slide.Export('${outputJpg.replace(/'/g, "''")}', "JPG", 1920, 1080)
-            $pres.Close()
-            $ppt.Quit()
-            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($ppt) | Out-Null
-            Write-Output "SUCCESS"
-          } catch {
-            Write-Error $_.Exception.Message
-            exit 1
-          }
-        `;
-
-        const psFile = path.join(tmpDir, "preview.ps1");
-        fs.writeFileSync(psFile, psScript, "utf8");
-
-        try {
-          await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psFile}"`);
-          if (fs.existsSync(outputJpg)) {
-            const jpgBuf = fs.readFileSync(outputJpg);
-            const base64Data = `data:image/jpeg;base64,${jpgBuf.toString("base64")}`;
-            return NextResponse.json({ success: true, previewImage: base64Data });
-          }
-        } catch {
-          // If Windows COM fails, fall back to zipImage below
-        } finally {
-          try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-        }
+      if (!isWindows) {
+        // On Linux / Vercel, signal client-side vector preview
+        return NextResponse.json({
+          success: true,
+          fallbackToVector: true,
+        });
       }
 
-      // Return extracted zip background image if COM wasn't used or failed
-      if (zipImage) {
-        return NextResponse.json({ success: true, previewImage: zipImage });
+      const pptxBuffer = Buffer.from(pptxBase64, "base64");
+      fs.mkdirSync(tmpDir, { recursive: true });
+      const inputPptx = path.join(tmpDir, "template.pptx");
+      const outputJpg = path.join(tmpDir, "preview.jpg");
+      fs.writeFileSync(inputPptx, pptxBuffer);
+
+      const psScript = `
+        try {
+          $ppt = New-Object -ComObject PowerPoint.Application
+          $pres = $ppt.Presentations.Open('${inputPptx.replace(/'/g, "''")}', -1, 0, 0)
+          $slide = $pres.Slides.Item(1)
+          $slide.Export('${outputJpg.replace(/'/g, "''")}', "JPG", 1920, 1080)
+          $pres.Close()
+          $ppt.Quit()
+          [System.Runtime.Interopservices.Marshal]::ReleaseComObject($ppt) | Out-Null
+          Write-Output "SUCCESS"
+        } catch {
+          Write-Error $_.Exception.Message
+          exit 1
+        }
+      `;
+
+      const psFile = path.join(tmpDir, "preview.ps1");
+      fs.writeFileSync(psFile, psScript, "utf8");
+
+      try {
+        await execAsync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psFile}"`);
+        if (fs.existsSync(outputJpg)) {
+          const jpgBuf = fs.readFileSync(outputJpg);
+          const base64Data = `data:image/jpeg;base64,${jpgBuf.toString("base64")}`;
+          return NextResponse.json({ success: true, previewImage: base64Data });
+        }
+      } catch {
+        // Fall through to fallbackToVector
+      } finally {
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
       }
 
       return NextResponse.json({
-        success: false,
-        error: "Could not generate slide preview image from PPTX",
+        success: true,
+        fallbackToVector: true,
       });
     }
 

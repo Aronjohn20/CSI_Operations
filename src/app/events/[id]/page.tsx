@@ -33,6 +33,7 @@ import {
   Award,
   Eye,
   EyeOff,
+  RotateCcw,
   Sliders,
   HelpCircle,
   ChevronDown,
@@ -748,17 +749,42 @@ export default function EventContainerPage() {
     );
   };
 
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const handleUpdateStatus = async (newStatus: "planned" | "confirmed" | "completed") => {
+    if (!event) return;
+    setIsUpdatingStatus(true);
+    try {
+      const updated: CSIEvent = {
+        ...event,
+        status: newStatus,
+      };
+      setEvent(updated);
+      await updateEvent(updated);
+      setDriveActionNotice({
+        type: "success",
+        text:
+          newStatus === "completed"
+            ? `Event marked as Completed! Moved to Completed Archive.`
+            : `Event reopened! Moved back to Active Containers.`,
+      });
+    } catch (err: any) {
+      alert("Failed to update status: " + err.message);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   useEffect(() => {
     if (!eventId) return;
 
     const loadEvent = async () => {
-      let found = getEventById(eventId);
+      const found = getEventById(eventId);
       if (found) {
         setEvent(found);
-        return;
       }
 
-      // If not present in local storage yet, fetch directly from Supabase
+      // Always fetch fresh live record from Supabase in background to ensure real-time URLs and status
       if (supabase) {
         try {
           const { data, error } = await supabase
@@ -782,6 +808,7 @@ export default function EventContainerPage() {
               status: (data.status || "confirmed") as "planned" | "confirmed" | "completed",
               required_coordinators: Number(data.required_coordinators) || 2,
               assigned_coordinators: Array.isArray(data.assigned_coordinators) ? data.assigned_coordinators : [],
+              registration_url: data.registration_url || data.google_form_url || undefined,
               google_form_url: data.google_form_url || undefined,
               google_form_edit_url: data.google_form_edit_url || undefined,
               google_form_id: data.google_form_id || undefined,
@@ -797,6 +824,8 @@ export default function EventContainerPage() {
               is_feedback_closed: data.is_feedback_closed || false,
               feedback_attendees: data.feedback_attendees || undefined,
               winners: data.winners || undefined,
+              certificate_templates: data.certificate_templates || undefined,
+              certificate_writeups: data.certificate_writeups || undefined,
             };
             setEvent(formatted);
             updateEvent(formatted);
@@ -910,10 +939,16 @@ export default function EventContainerPage() {
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-3xl font-extrabold text-white tracking-tight">{event.event_name}</h1>
-              <span className="text-xs px-3 py-1 rounded-full font-bold bg-green-500/20 text-green-300 border border-green-500/40 capitalize">
+              <span
+                className={`text-xs px-3 py-1 rounded-full font-bold border capitalize ${
+                  event.status === "completed"
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                }`}
+              >
                 {event.status}
               </span>
-              <span className="text-xs px-3 py-1 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+              <span className="text-xs px-3 py-1 rounded-full font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                 {event.mode}
               </span>
             </div>
@@ -924,7 +959,29 @@ export default function EventContainerPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {event.status !== "completed" ? (
+            <button
+              onClick={() => handleUpdateStatus("completed")}
+              disabled={isUpdatingStatus}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-2 transition shadow-lg shadow-emerald-900/30 border border-emerald-400/40 disabled:opacity-50"
+              title="Mark event as Completed and move to Completed Archive"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+              <span>Mark as Completed</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => handleUpdateStatus("confirmed")}
+              disabled={isUpdatingStatus}
+              className="px-4 py-2 rounded-xl bg-amber-600/80 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-2 transition shadow-lg shadow-amber-900/30 border border-amber-400/40 disabled:opacity-50"
+              title="Reopen event into Active containers"
+            >
+              <RotateCcw className="w-4 h-4 text-amber-200" />
+              <span>Reopen Event</span>
+            </button>
+          )}
+
           <button
             onClick={handleDeleteEvent}
             className="px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/30 text-xs font-bold flex items-center gap-1.5 transition"

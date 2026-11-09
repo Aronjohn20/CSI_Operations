@@ -142,43 +142,9 @@ export async function extractPptxData(file: File): Promise<{
     console.warn("Could not fetch PowerPoint slide preview from API:", err);
   }
 
-  // 2. Fallback: Extract largest background image from ppt/media/
-  if (!previewImageBase64) {
-    try {
-      const zip = await JSZip.loadAsync(buffer);
-      const mediaFiles = Object.keys(zip.files).filter(
-        (f) => f.startsWith("ppt/media/") && !zip.files[f].dir
-      );
-
-      let maxLen = 0;
-      let candidateData: string | undefined = undefined;
-      let candidateExt = "jpeg";
-
-      for (const m of mediaFiles) {
-        const lower = m.toLowerCase();
-        if (
-          lower.endsWith(".png") ||
-          lower.endsWith(".jpg") ||
-          lower.endsWith(".jpeg") ||
-          lower.endsWith(".webp")
-        ) {
-          const data = await zip.files[m].async("base64");
-          if (data.length > maxLen) {
-            maxLen = data.length;
-            candidateExt = lower.endsWith(".png") ? "png" : "jpeg";
-            candidateData = data;
-          }
-        }
-      }
-
-      if (candidateData) {
-        previewImageBase64 = `data:image/${candidateExt};base64,${candidateData}`;
-      }
-    } catch (err) {
-      console.warn("Could not extract image from PPTX", err);
-    }
-  }
-
+  // If PowerPoint COM is available (on Windows localhost), previewImageBase64 is returned.
+  // On Vercel / Linux, previewImageBase64 is cleanly undefined, which automatically
+  // instructs the system to render the official CSI SB RSET vector certificate (Image 2).
   return {
     pptxBuffer: buffer,
     previewImageBase64,
@@ -655,19 +621,27 @@ export function renderCertificatePage(
   const isWinner = info.position === "1st" || info.position === "2nd" || info.position === "3rd";
   const formattedName = formatCertificateName(info.attendee.name);
 
-  // If a custom template background image is uploaded, render it full-bleed
-  // and stamp the dynamic formatted name & event write-up onto it!
+  // If a custom template background image is uploaded and is a valid landscape slide (aspect ratio >= 1.2),
+  // render it full-bleed and stamp the dynamic formatted name & event write-up onto it!
+  // If it's a cropped logo or vertical asset (like an embedded badge), fall through to the official CSI vector template.
+  let hasValidCustomTemplate = false;
   if (info.templateImage) {
     try {
-      doc.addImage(info.templateImage, "PNG", 0, 0, pageWidth, pageHeight);
-    } catch {
-      try {
-        doc.addImage(info.templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
-      } catch (err) {
-        console.warn("Could not draw custom template image", err);
+      const props = doc.getImageProperties(info.templateImage);
+      if (props.width > 0 && props.height > 0 && props.width / props.height >= 1.2) {
+        hasValidCustomTemplate = true;
+        try {
+          doc.addImage(info.templateImage, "PNG", 0, 0, pageWidth, pageHeight);
+        } catch {
+          doc.addImage(info.templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
+        }
       }
+    } catch (err) {
+      console.warn("Could not validate or draw custom template image", err);
     }
+  }
 
+  if (hasValidCustomTemplate) {
     // Cover the middle placeholder region (Name line + Writeup line) with clean background
     doc.setFillColor(255, 255, 255);
     doc.rect(38, 98, 221, 54, "F");

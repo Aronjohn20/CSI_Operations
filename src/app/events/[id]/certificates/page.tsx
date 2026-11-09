@@ -119,8 +119,39 @@ export default function CertificateStudioPage() {
       }
 
       if (found.certificate_templates) {
-        setAppreciationTemplate(found.certificate_templates.appreciation_template_data || "");
-        setParticipationTemplate(found.certificate_templates.participation_template_data || "");
+        const rawAppr = found.certificate_templates.appreciation_template_data || "";
+        const rawPart = found.certificate_templates.participation_template_data || "";
+
+        // Auto-sanitize: verify template image is a real landscape slide (not a cropped vertical badge or logo)
+        if (rawAppr) {
+          const img = new Image();
+          img.onload = () => {
+            if (img.width > 0 && img.height > 0 && img.width / img.height >= 1.2) {
+              setAppreciationTemplate(rawAppr);
+            } else {
+              setAppreciationTemplate("");
+            }
+          };
+          img.onerror = () => setAppreciationTemplate("");
+          img.src = rawAppr;
+        } else {
+          setAppreciationTemplate("");
+        }
+
+        if (rawPart) {
+          const img = new Image();
+          img.onload = () => {
+            if (img.width > 0 && img.height > 0 && img.width / img.height >= 1.2) {
+              setParticipationTemplate(rawPart);
+            } else {
+              setParticipationTemplate("");
+            }
+          };
+          img.onerror = () => setParticipationTemplate("");
+          img.src = rawPart;
+        } else {
+          setParticipationTemplate("");
+        }
       }
 
       // Restore PPTX templates: first check Supabase permanent Storage Bucket URLs, then session storage
@@ -519,7 +550,22 @@ export default function CertificateStudioPage() {
 
         const data = await res.json();
         if (!isCancelled && data.success && data.previewImage) {
-          setLiveSlidePreview(data.previewImage);
+          const img = new Image();
+          img.onload = () => {
+            if (!isCancelled) {
+              if (img.width > 0 && img.height > 0 && img.width / img.height >= 1.2) {
+                setLiveSlidePreview(data.previewImage);
+              } else {
+                setLiveSlidePreview("");
+              }
+            }
+          };
+          img.onerror = () => {
+            if (!isCancelled) setLiveSlidePreview("");
+          };
+          img.src = data.previewImage;
+        } else if (!isCancelled) {
+          setLiveSlidePreview("");
         }
       } catch (err) {
         console.warn("Could not generate live slide preview:", err);
@@ -1424,19 +1470,41 @@ export default function CertificateStudioPage() {
               <Trophy className="w-4 h-4 text-amber-400" />
               Certificate of Appreciation
             </h3>
-            {(appreciationPptxFile || appreciationTemplate) && (
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   setAppreciationTemplate("");
                   setAppreciationPptxFile(null);
-                  saveEventChanges(firstPlaceWinners, secondPlaceWinners, thirdPlaceWinners, "");
+                  setLiveSlidePreview("");
+                  try {
+                    sessionStorage.removeItem(`csi_appr_pptx_${eventId}`);
+                    sessionStorage.removeItem(`csi_appr_pptx_name_${eventId}`);
+                  } catch {}
+                  saveEventChanges(
+                    firstPlaceWinners,
+                    secondPlaceWinners,
+                    thirdPlaceWinners,
+                    "",
+                    participationTemplate,
+                    attendees,
+                    {
+                      appreciation_template_data: "",
+                      appreciation_pptx_url: undefined,
+                      appreciation_filename: undefined,
+                    }
+                  );
+                  setStatusNotice({
+                    type: "success",
+                    text: "Switched to Official CSI SB RSET Appreciation Certificate vector template.",
+                  });
                 }}
-                className="text-xs text-red-400 hover:text-white flex items-center gap-1 font-bold"
+                className="text-xs px-2.5 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-800 text-purple-200 hover:text-white flex items-center gap-1 font-bold border border-purple-500/30 transition"
+                title="Reset to built-in official CSI SB RSET vector template"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset
+                <span>Use Official Template</span>
               </button>
-            )}
+            </div>
           </div>
 
           <label className="flex items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-amber-500/50 hover:border-amber-400 bg-black/40 text-amber-200 text-xs font-bold cursor-pointer transition">
@@ -1445,8 +1513,8 @@ export default function CertificateStudioPage() {
               {appreciationPptxFile
                 ? `Loaded: ${appreciationPptxFile.name}`
                 : appreciationTemplate
-                ? "Replace Template (.pptx)"
-                : "Upload Appreciation Template (.pptx)"}
+                ? "Replace Template (.pptx / .png)"
+                : "Upload Custom Slide Template (.pptx / .png)"}
             </span>
             <input
               type="file"
@@ -1464,25 +1532,41 @@ export default function CertificateStudioPage() {
               <Award className="w-4 h-4 text-cyan-400" />
               Certificate of Participation
             </h3>
-            {(participationPptxFile || participationTemplate) && (
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   setParticipationTemplate("");
                   setParticipationPptxFile(null);
+                  setLiveSlidePreview("");
+                  try {
+                    sessionStorage.removeItem(`csi_part_pptx_${eventId}`);
+                    sessionStorage.removeItem(`csi_part_pptx_name_${eventId}`);
+                  } catch {}
                   saveEventChanges(
                     firstPlaceWinners,
                     secondPlaceWinners,
                     thirdPlaceWinners,
                     appreciationTemplate,
-                    ""
+                    "",
+                    attendees,
+                    {
+                      participation_template_data: "",
+                      participation_pptx_url: undefined,
+                      participation_filename: undefined,
+                    }
                   );
+                  setStatusNotice({
+                    type: "success",
+                    text: "Switched to Official CSI SB RSET Participation Certificate vector template.",
+                  });
                 }}
-                className="text-xs text-red-400 hover:text-white flex items-center gap-1 font-bold"
+                className="text-xs px-2.5 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-800 text-purple-200 hover:text-white flex items-center gap-1 font-bold border border-purple-500/30 transition"
+                title="Reset to built-in official CSI SB RSET vector template"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset
+                <span>Use Official Template</span>
               </button>
-            )}
+            </div>
           </div>
 
           <label className="flex items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-cyan-500/50 hover:border-cyan-400 bg-black/40 text-cyan-200 text-xs font-bold cursor-pointer transition">
@@ -1491,8 +1575,8 @@ export default function CertificateStudioPage() {
               {participationPptxFile
                 ? `Loaded: ${participationPptxFile.name}`
                 : participationTemplate
-                ? "Replace Template (.pptx)"
-                : "Upload Participation Template (.pptx)"}
+                ? "Replace Template (.pptx / .png)"
+                : "Upload Custom Slide Template (.pptx / .png)"}
             </span>
             <input
               type="file"
