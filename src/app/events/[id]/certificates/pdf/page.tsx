@@ -221,21 +221,21 @@ export default function CertificatePdfStudioPage() {
       ctx.fillStyle = textGrad;
       ctx.strokeStyle = textGrad;
 
-      // 3. Palace Script MT large bold cursive font at 190px
+      // 3. Palace Script MT large bold cursive font at 160px
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      let fontSize = 190;
+      let fontSize = 160;
       ctx.font = `bold italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive`;
-      while (ctx.measureText(nameToRender).width > 1400 && fontSize > 100) {
+      while (ctx.measureText(nameToRender).width > 1300 && fontSize > 90) {
         fontSize -= 4;
         ctx.font = `bold italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive`;
       }
 
       // 4. Stroke + Fill for true substantial boldness & rich gold body
       ctx.lineJoin = "round";
-      ctx.lineWidth = 4;
-      ctx.strokeText(nameToRender, 960, 498);
-      ctx.fillText(nameToRender, 960, 498);
+      ctx.lineWidth = 3.8;
+      ctx.strokeText(nameToRender, 960, 500);
+      ctx.fillText(nameToRender, 960, 500);
     };
 
     if (templateBg) {
@@ -278,7 +278,7 @@ export default function CertificatePdfStudioPage() {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(360, 420, 1200, 134);
 
-        // 2. Draw student's real name in matching bold gold cursive calligraphy at 190px
+        // 2. Draw student's real name in matching bold gold cursive calligraphy at 160px
         const formatted = formatCertificateName(name);
         const textGrad = ctx.createLinearGradient(960 - 450, 0, 960 + 450, 0);
         textGrad.addColorStop(0, "#CF9F1C");
@@ -289,18 +289,18 @@ export default function CertificatePdfStudioPage() {
 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        let fontSize = 190;
+        let fontSize = 160;
         ctx.font = `bold italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive`;
-        while (ctx.measureText(formatted).width > 1400 && fontSize > 100) {
+        while (ctx.measureText(formatted).width > 1300 && fontSize > 90) {
           fontSize -= 4;
           ctx.font = `bold italic ${fontSize}px "Palace Script MT", "Pinyon Script", "Alex Brush", "Great Vibes", "Allura", "Edwardian Script ITC", cursive`;
         }
 
         // Stroke + Fill for true substantial boldness & rich gold body
         ctx.lineJoin = "round";
-        ctx.lineWidth = 4;
-        ctx.strokeText(formatted, 960, 498);
-        ctx.fillText(formatted, 960, 498);
+        ctx.lineWidth = 3.8;
+        ctx.strokeText(formatted, 960, 500);
+        ctx.fillText(formatted, 960, 500);
 
         resolve(canvas.toDataURL("image/jpeg", 0.96));
       };
