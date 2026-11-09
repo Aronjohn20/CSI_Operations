@@ -318,7 +318,7 @@ export default function CertificatePdfStudioPage() {
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
 
-        const startX = 480;
+        const startX = 475;
         // Main number: bold 33px Times New Roman
         ctx.font = 'bold 33px "Times New Roman", serif';
         ctx.fillText(num, startX, 630);
@@ -416,7 +416,7 @@ export default function CertificatePdfStudioPage() {
           ctx.textAlign = "left";
           ctx.textBaseline = "alphabetic";
 
-          const startX = 480;
+          const startX = 475;
           // Main number: bold 33px Times New Roman
           ctx.font = 'bold 33px "Times New Roman", serif';
           ctx.fillText(num, startX, 630);
