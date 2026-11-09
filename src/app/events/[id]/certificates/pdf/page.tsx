@@ -500,7 +500,7 @@ export default function CertificatePdfStudioPage() {
       }
 
       const masterBlob = masterDoc.output("blob");
-      zip.file(`All_Certificates_${isWinners ? "Winners" : "Participation"}.pdf`, await masterBlob.arrayBuffer());
+      // zip.file(`All_Certificates_${isWinners ? "Winners" : "Participation"}.pdf`, await masterBlob.arrayBuffer());
 
       // Download ZIP
       const zipBlob = await zip.generateAsync({ type: "blob" });
