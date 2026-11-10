@@ -370,11 +370,9 @@ export function generateDefaultFeedbackQuestions(event: CSIEvent): FeedbackQuest
  * Builds the official form header description based on event aims
  */
 export function getFeedbackHeaderDescription(event: CSIEvent): string {
-  const customDesc = event.brief_description
-    ? `${event.event_name} is ${event.brief_description}`
-    : `${event.event_name} is a premier technical initiative organized by the Computer Society of India (CSI) Student Branch, RSET.`;
+  const intro = `Please take a moment to share your valuable feedback and ratings for ${event.event_name}, organized by the Computer Society of India (CSI) Student Branch, RSET.`;
 
-  return `${customDesc}\nThank you for participating – your feedback will help us improve and deliver even better events ahead!`;
+  return `${intro}\nThank you for participating – your feedback will help us improve and deliver even better events ahead!`;
 }
 
 /**

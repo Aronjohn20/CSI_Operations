@@ -794,41 +794,41 @@ export default function EventContainerPage() {
             .maybeSingle();
 
           if (data && !error) {
+            const currentLocal = getEventById(eventId);
             const formatted: CSIEvent = {
               id: data.id,
-              event_name: data.event_name || "Untitled Event",
-              event_date: data.event_date || new Date().toISOString().split("T")[0],
-              time_start: data.time_start || "09:30 AM",
-              time_end: data.time_end || "04:30 PM",
-              mode: (data.mode || "Offline") as "Offline" | "Online",
-              venue: data.venue || "Auditorium",
-              target_branches: data.target_branches || ["CSE", "CSBS", "IT", "AD"],
-              faculty_in_charge: data.faculty_in_charge || "Dr. Tripti C",
-              brief_description: data.brief_description || "",
-              status: (data.status || "confirmed") as "planned" | "confirmed" | "completed",
-              required_coordinators: Number(data.required_coordinators) || 2,
-              assigned_coordinators: Array.isArray(data.assigned_coordinators) ? data.assigned_coordinators : [],
-              registration_url: data.registration_url || data.google_form_url || undefined,
-              google_form_url: data.google_form_url || undefined,
-              google_form_edit_url: data.google_form_edit_url || undefined,
-              google_form_id: data.google_form_id || undefined,
-              google_sheet_url: data.google_sheet_url || undefined,
-              google_sheet_id: data.google_sheet_id || undefined,
-              is_registration_closed: data.is_registration_closed || false,
-              registered_attendees: data.registered_attendees || undefined,
-              feedback_google_form_url: data.feedback_google_form_url || undefined,
-              feedback_google_form_edit_url: data.feedback_google_form_edit_url || undefined,
-              feedback_google_form_id: data.feedback_google_form_id || undefined,
-              feedback_google_sheet_url: data.feedback_google_sheet_url || undefined,
-              feedback_google_sheet_id: data.feedback_google_sheet_id || undefined,
-              is_feedback_closed: data.is_feedback_closed || false,
-              feedback_attendees: data.feedback_attendees || undefined,
-              winners: data.winners || undefined,
-              certificate_templates: data.certificate_templates || undefined,
-              certificate_writeups: data.certificate_writeups || undefined,
+              event_name: data.event_name || currentLocal?.event_name || "Untitled Event",
+              event_date: data.event_date || currentLocal?.event_date || new Date().toISOString().split("T")[0],
+              time_start: data.time_start || currentLocal?.time_start || "09:30 AM",
+              time_end: data.time_end || currentLocal?.time_end || "04:30 PM",
+              mode: (data.mode || currentLocal?.mode || "Offline") as "Offline" | "Online",
+              venue: data.venue || currentLocal?.venue || "Auditorium",
+              target_branches: data.target_branches || currentLocal?.target_branches || ["CSE", "CSBS", "IT", "AD"],
+              faculty_in_charge: data.faculty_in_charge || currentLocal?.faculty_in_charge || "Dr. Tripti C",
+              brief_description: data.brief_description || currentLocal?.brief_description || "",
+              status: (data.status || currentLocal?.status || "confirmed") as "planned" | "confirmed" | "completed",
+              required_coordinators: Number(data.required_coordinators) || currentLocal?.required_coordinators || 2,
+              assigned_coordinators: Array.isArray(data.assigned_coordinators) ? data.assigned_coordinators : (currentLocal?.assigned_coordinators || []),
+              registration_url: data.registration_url || data.google_form_url || currentLocal?.registration_url || currentLocal?.google_form_url || undefined,
+              google_form_url: data.google_form_url || currentLocal?.google_form_url || undefined,
+              google_form_edit_url: data.google_form_edit_url || currentLocal?.google_form_edit_url || undefined,
+              google_form_id: data.google_form_id || currentLocal?.google_form_id || undefined,
+              google_sheet_url: data.google_sheet_url || currentLocal?.google_sheet_url || undefined,
+              google_sheet_id: data.google_sheet_id || currentLocal?.google_sheet_id || undefined,
+              is_registration_closed: data.is_registration_closed ?? currentLocal?.is_registration_closed ?? false,
+              registered_attendees: data.registered_attendees || currentLocal?.registered_attendees || undefined,
+              feedback_google_form_url: data.feedback_google_form_url || currentLocal?.feedback_google_form_url || undefined,
+              feedback_google_form_edit_url: data.feedback_google_form_edit_url || currentLocal?.feedback_google_form_edit_url || undefined,
+              feedback_google_form_id: data.feedback_google_form_id || currentLocal?.feedback_google_form_id || undefined,
+              feedback_google_sheet_url: data.feedback_google_sheet_url || currentLocal?.feedback_google_sheet_url || undefined,
+              feedback_google_sheet_id: data.feedback_google_sheet_id || currentLocal?.feedback_google_sheet_id || undefined,
+              is_feedback_closed: data.is_feedback_closed ?? currentLocal?.is_feedback_closed ?? false,
+              feedback_attendees: data.feedback_attendees || currentLocal?.feedback_attendees || undefined,
+              winners: data.winners || currentLocal?.winners || undefined,
+              certificate_templates: data.certificate_templates || currentLocal?.certificate_templates || undefined,
+              certificate_writeups: data.certificate_writeups || currentLocal?.certificate_writeups || undefined,
             };
             setEvent(formatted);
-            updateEvent(formatted);
             return;
           }
         } catch {
@@ -846,7 +846,10 @@ export default function EventContainerPage() {
     loadEvent();
 
     const handleEventsUpdated = () => {
-      loadEvent();
+      const fresh = getEventById(eventId);
+      if (fresh) {
+        setEvent((prev) => (prev ? { ...prev, ...fresh } : fresh));
+      }
     };
 
     window.addEventListener("csi_events_updated", handleEventsUpdated);
