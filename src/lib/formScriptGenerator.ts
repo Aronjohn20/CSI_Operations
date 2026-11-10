@@ -52,9 +52,9 @@ function ${cleanFuncName}() {
 
   // 1. Create Google Form
   const form = FormApp.create(formTitle);
-  form.setCollectEmail(false);
+  form.setLimitOneResponsePerUser(true);
   form.setAllowResponseEdits(false);
-  form.setLimitOneResponsePerUser(false);
+  form.setCollectEmail(false);
   form.setProgressBar(false);
   form.setShuffleQuestions(false);
   form.setShowLinkToRespondAgain(false);

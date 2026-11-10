@@ -388,7 +388,7 @@ export function replaceWriteupInSlideXml(
           "gi"
         );
         xml = xml.replace(reg, eventName);
-      } catch {}
+      } catch { }
     }
   }
 
@@ -706,21 +706,21 @@ export function renderCertificatePage(
 
     const segments: { text: string; bold?: boolean }[] = isWinner
       ? [
-          { text: "has secured " },
-          { text: `${pos} place`, bold: true },
-          { text: ` in the ${modeStr} Intra-College technical event titled ` },
-          { text: info.eventName, bold: true },
-          {
-            text: `, held on ${formattedDate}, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.`,
-          },
-        ]
+        { text: "has secured " },
+        { text: `${pos} place`, bold: true },
+        { text: ` in the ${modeStr} Intra-College technical event titled ` },
+        { text: info.eventName, bold: true },
+        {
+          text: `, held on ${formattedDate}, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.`,
+        },
+      ]
       : [
-          { text: `has actively participated in the ${modeStr} Intra-College technical event titled ` },
-          { text: info.eventName, bold: true },
-          {
-            text: `, held on ${formattedDate}, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.`,
-          },
-        ];
+        { text: `has actively participated in the ${modeStr} Intra-College technical event titled ` },
+        { text: info.eventName, bold: true },
+        {
+          text: `, held on ${formattedDate}, organized by the Computer Society of India (CSI) SB at Rajagiri School of Engineering and Technology, Kakkanad.`,
+        },
+      ];
 
     doc.setTextColor(30, 30, 40);
     renderRichTextCentered(doc, segments, pageWidth / 2, 124, 195, 10.5, 5.2);
@@ -1238,7 +1238,7 @@ export async function convertPdfToImageDataUrl(pdfBuffer: ArrayBuffer): Promise<
         try {
           (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
             "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-        } catch {}
+        } catch { }
         resolve();
       };
       script.onerror = () => reject(new Error("Failed to load PDF.js engine"));
