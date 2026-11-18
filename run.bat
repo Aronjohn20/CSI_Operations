@@ -1,5 +1,5 @@
 @echo off
-set "PATH=R:\Hermes\Agent Data\node;%PATH%"
+set "PATH=R:\BACKUP\Hermes\Agent Data\node;R:\Hermes\Agent Data\node;%PATH%"
 cd /d "%~dp0"
 echo ========================================================
 echo   Starting CSI Operations Local Development Server

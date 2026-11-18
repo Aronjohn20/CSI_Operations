@@ -103,6 +103,11 @@ export default function EventContainerPage() {
   const [isSyncingFromDrive, setIsSyncingFromDrive] = useState(false);
   const [driveActionNotice, setDriveActionNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Bitly Shortlink State
+  const [isEditingBitly, setIsEditingBitly] = useState(false);
+  const [customBitlyInput, setCustomBitlyInput] = useState("");
+  const [isShorteningBitly, setIsShorteningBitly] = useState(false);
+
   // Google Sheet / Registrations Sync State
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [sheetInput, setSheetInput] = useState("");
@@ -139,6 +144,11 @@ export default function EventContainerPage() {
         throw new Error(data.error || "Failed to create form in Google Drive.");
       }
 
+      const bitlyUrl =
+        data.bitlyUrl ||
+        event.bitly_url ||
+        `https://bit.ly/csi-${event.event_name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
+
       const updated: CSIEvent = {
         ...event,
         google_form_url: data.formUrl,
@@ -147,6 +157,7 @@ export default function EventContainerPage() {
         google_sheet_url: data.sheetUrl,
         google_sheet_id: data.sheetId,
         registration_url: data.formUrl,
+        bitly_url: bitlyUrl,
         is_registration_closed: false,
       };
 
@@ -154,7 +165,9 @@ export default function EventContainerPage() {
       updateEvent(updated);
       setDriveActionNotice({
         type: "success",
-        text: "Google Form & Responses Sheet created directly in your CSI Google Drive!",
+        text: data.bitlyUrl
+          ? `Google Form created & shortened to Bitly: ${data.bitlyUrl}`
+          : "Google Form & Responses Sheet created directly in your CSI Google Drive!",
       });
     } catch (err: any) {
       setDriveActionNotice({
@@ -163,6 +176,61 @@ export default function EventContainerPage() {
       });
     } finally {
       setIsCreatingFormInDrive(false);
+    }
+  };
+
+  const handleSaveCustomBitly = () => {
+    if (!event) return;
+    const cleanLink = customBitlyInput.trim();
+    if (!cleanLink) return;
+    const updated: CSIEvent = {
+      ...event,
+      bitly_url: cleanLink,
+    };
+    setEvent(updated);
+    updateEvent(updated);
+    setIsEditingBitly(false);
+    setDriveActionNotice({
+      type: "success",
+      text: `Bitly link updated to: ${cleanLink}`,
+    });
+  };
+
+  const handleGenerateBitlyNow = async () => {
+    if (!event || !event.google_form_url) return;
+    setIsShorteningBitly(true);
+    setDriveActionNotice(null);
+    try {
+      const res = await fetch("/api/google-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "shorten_url",
+          longUrl: event.google_form_url,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.bitlyUrl) {
+        const updated: CSIEvent = {
+          ...event,
+          bitly_url: data.bitlyUrl,
+        };
+        setEvent(updated);
+        updateEvent(updated);
+        setDriveActionNotice({
+          type: "success",
+          text: `Bitly link generated: ${data.bitlyUrl}`,
+        });
+      } else {
+        throw new Error(data.error || "Bitly shortening failed. Please verify BITLY_ACCESS_TOKEN in .env.local.");
+      }
+    } catch (err: any) {
+      setDriveActionNotice({
+        type: "error",
+        text: err.message || "Failed to shorten link with Bitly.",
+      });
+    } finally {
+      setIsShorteningBitly(false);
     }
   };
 
@@ -903,7 +971,10 @@ export default function EventContainerPage() {
       : "all";
 
   const mockRegUrl = event.google_form_url || `https://forms.gle/csi-${event.id}`;
-  const mockBitlyUrl = event.google_form_url || `https://bit.ly/csi-${event.event_name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
+  const effectiveBitlyUrl =
+    event.bitly_url ||
+    `https://bit.ly/csi-${event.event_name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
+  const mockBitlyUrl = effectiveBitlyUrl;
   const mockFeedbackUrl = `https://forms.gle/csi-feedback-${event.id}`;
 
   const facultyCoordinator = "Dr. Tripti C";
@@ -1107,7 +1178,7 @@ export default function EventContainerPage() {
                       rsmsDescription,
                       coordinatorListWithClass,
                       facultyCoordinator,
-                      mockBitlyUrl
+                      effectiveBitlyUrl
                     )
                   }
                   className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600 text-[16px] font-bold flex items-center gap-2 transition shadow"
@@ -1128,7 +1199,7 @@ export default function EventContainerPage() {
                       rsmsDescription,
                       coordinatorListWithClass,
                       facultyCoordinator,
-                      mockBitlyUrl
+                      effectiveBitlyUrl
                     )
                   }
                   className="px-4 py-2 rounded-lg bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
@@ -1136,6 +1207,17 @@ export default function EventContainerPage() {
                 >
                   <FileDown className="w-4 h-4" />
                   <span>Download Word</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const fullNoticeText = `${event.event_name.toUpperCase()}\n\n${rsmsDescription}\n\nDate: ${formattedDateFull}\nTime: ${timeFormatted}\n${venueLabel}: ${event.venue}\n\nStudent Coordinators:\n${coordinatorListWithClass.join("\n")}\n\nFaculty Coordinator: ${facultyCoordinator}\n\nRegistration Link: ${effectiveBitlyUrl}`;
+                    copyToClipboard(fullNoticeText, "rsmsNotice");
+                  }}
+                  className="px-4 py-2 rounded-lg bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-500/40 text-[16px] font-bold flex items-center gap-2 transition shadow"
+                  title="Copy formatted notice to clipboard"
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>{copiedSection === "rsmsNotice" ? "Copied Notice!" : "Copy Notice"}</span>
                 </button>
               </div>
             </div>
@@ -1166,12 +1248,12 @@ export default function EventContainerPage() {
               <p>
                 Registration Link:{" "}
                 <a
-                  href={mockBitlyUrl}
+                  href={effectiveBitlyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:text-blue-300 underline font-sans font-medium"
                 >
-                  {mockBitlyUrl}
+                  {effectiveBitlyUrl}
                 </a>
               </p>
             </div>
@@ -1371,6 +1453,84 @@ export default function EventContainerPage() {
                       </a>
                     )}
                   </div>
+
+                  {/* Bitly Shortlink Row */}
+                  <div className="pt-2 border-t border-purple-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-bold font-mono text-xs border border-cyan-500/40">
+                        BITLY LINK
+                      </span>
+                      {isEditingBitly ? (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <input
+                            type="text"
+                            value={customBitlyInput}
+                            onChange={(e) => setCustomBitlyInput(e.target.value)}
+                            placeholder="https://bit.ly/your-link"
+                            className="px-2.5 py-1 bg-slate-900 border border-cyan-500/50 rounded text-cyan-200 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSaveCustomBitly}
+                            className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingBitly(false)}
+                            className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded text-xs"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <a
+                          href={effectiveBitlyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-300 hover:text-cyan-200 underline font-mono text-xs font-semibold"
+                        >
+                          {effectiveBitlyUrl}
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(effectiveBitlyUrl, "bitlyUrl")}
+                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>{copiedSection === "bitlyUrl" ? "Copied!" : "Copy Bitly"}</span>
+                      </button>
+                      {!isEditingBitly && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomBitlyInput(effectiveBitlyUrl);
+                            setIsEditingBitly(true);
+                          }}
+                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {event.google_form_url && (
+                        <button
+                          type="button"
+                          onClick={handleGenerateBitlyNow}
+                          disabled={isShorteningBitly}
+                          className="px-2.5 py-1 rounded bg-cyan-900/40 hover:bg-cyan-800 text-cyan-300 border border-cyan-500/40 text-xs font-semibold flex items-center gap-1.5 transition"
+                          title="Generate/Re-shorten Google Form with Bitly Token"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isShorteningBitly ? "animate-spin" : ""}`} />
+                          <span>{isShorteningBitly ? "Shortening..." : "Generate Bitly"}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1523,12 +1683,21 @@ export default function EventContainerPage() {
                 )}
               </div>
 
-              <button
-                onClick={() => copyToClipboard(event.google_form_url || mockRegUrl, "regUrl")}
-                className="text-[16px] text-amber-300 hover:text-white font-bold underline"
-              >
-                {copiedSection === "regUrl" ? "Copied Link!" : "Copy Public Link"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => copyToClipboard(event.google_form_url || mockRegUrl, "regUrl")}
+                  className="text-[16px] text-amber-300 hover:text-white font-bold underline"
+                >
+                  {copiedSection === "regUrl" ? "Copied Form Link!" : "Copy Public Link"}
+                </button>
+                <span className="text-slate-600">•</span>
+                <button
+                  onClick={() => copyToClipboard(effectiveBitlyUrl, "bitlyUrlBottom")}
+                  className="text-[16px] text-cyan-300 hover:text-white font-bold underline"
+                >
+                  {copiedSection === "bitlyUrlBottom" ? "Copied Bitly!" : "Copy Bitly Link"}
+                </button>
+              </div>
             </div>
           </div>
 

@@ -92,6 +92,8 @@ export async function syncEventsWithSupabase(): Promise<CSIEvent[]> {
         google_form_url: dbRow.google_form_url || fallback?.google_form_url,
         google_form_edit_url: dbRow.google_form_edit_url || fallback?.google_form_edit_url,
         google_form_id: dbRow.google_form_id || fallback?.google_form_id,
+        registration_url: dbRow.registration_url || fallback?.registration_url,
+        bitly_url: dbRow.bitly_url || fallback?.bitly_url,
         google_sheet_url: dbRow.google_sheet_url || fallback?.google_sheet_url,
         google_sheet_id: dbRow.google_sheet_id || fallback?.google_sheet_id,
         is_registration_closed: dbRow.is_registration_closed ?? fallback?.is_registration_closed ?? false,
@@ -263,6 +265,10 @@ export function saveNewEvent(newEvent: Omit<CSIEvent, "id">): CSIEvent {
           required_coordinators: created.required_coordinators,
           assigned_coordinators: created.assigned_coordinators,
           google_form_url: created.google_form_url || null,
+          google_form_edit_url: created.google_form_edit_url || null,
+          google_form_id: created.google_form_id || null,
+          registration_url: created.registration_url || null,
+          bitly_url: created.bitly_url || null,
           google_sheet_url: created.google_sheet_url || null,
           is_registration_closed: created.is_registration_closed || false,
           registered_attendees: created.registered_attendees || [],
@@ -413,6 +419,8 @@ export function updateEvent(updatedEvent: CSIEvent): void {
         if (updatedEvent.google_form_url !== undefined) payload.google_form_url = updatedEvent.google_form_url;
         if (updatedEvent.google_form_edit_url !== undefined) payload.google_form_edit_url = updatedEvent.google_form_edit_url;
         if (updatedEvent.google_form_id !== undefined) payload.google_form_id = updatedEvent.google_form_id;
+        if (updatedEvent.registration_url !== undefined) payload.registration_url = updatedEvent.registration_url;
+        if (updatedEvent.bitly_url !== undefined) payload.bitly_url = updatedEvent.bitly_url;
         if (updatedEvent.google_sheet_url !== undefined) payload.google_sheet_url = updatedEvent.google_sheet_url;
         if (updatedEvent.google_sheet_id !== undefined) payload.google_sheet_id = updatedEvent.google_sheet_id;
         if (updatedEvent.is_registration_closed !== undefined) payload.is_registration_closed = updatedEvent.is_registration_closed;
