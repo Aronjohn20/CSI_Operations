@@ -171,11 +171,12 @@ R:\Downloads\CSI_Operations-main\CSI_Operations-main
   * **Role**: Single Event Master Operational Container.
   * **Key Mechanism**: The central command center for a selected event. Coordinates:
     1. Event metadata display and status toggle.
-    2. Google Form creation via `/api/google-form/route.ts`.
-    3. Roster synchronization from Google Sheets.
-    4. 1-click export of Attendance Sheets, Principal Permission Letters, and RSMS Notices via `documentExport.ts`.
-    5. Outcome-based feedback configuration, Drive deployment, and auditorium QR code generation.
-    6. Secret Easter Egg (click the lock icon in the top header, enter the secret passkey `"Bayern Munich"`) to reveal the coordinator appreciation certificate generator.
+    2. Google Form creation via `/api/google-form/route.ts` with automatic Bitly shortlink generation.
+    3. Live Bitly link management (1-click copy, manual custom slug editor, and on-demand re-shortening).
+    4. Roster synchronization from Google Sheets into the Attendance pipeline.
+    5. 1-click export of Attendance Sheets, Principal Permission Letters, and RSMS Notices (with embedded Bitly hyperlinks and a 1-click "Copy Notice" clipboard button) via `documentExport.ts`.
+    6. Outcome-based feedback configuration, Drive deployment, and auditorium QR code generation.
+    7. Secret Easter Egg (click the lock icon in the top header, enter the secret passkey `"Bayern Munich"`) to reveal the coordinator appreciation certificate generator.
 * **`src/app/events/[id]/certificates/page.tsx`**:
   * **Role**: Dedicated Dual PPTX/PDF Certificate Studio.
   * **Key Mechanism**: Ingests participant feedback responses. Provides interactive winner pickers (1st, 2nd, 3rd place). Accepts PowerPoint templates (`.pptx`) or image backgrounds (`.png`/`.jpg`). Executes client-side XML substitution and vector rendering via `certificateExport.ts` and exports a organized `.zip` archive containing both custom `.pptx` slides and high-resolution `.pdf` files.
@@ -188,8 +189,11 @@ R:\Downloads\CSI_Operations-main\CSI_Operations-main
 
 #### 2. Backend Serverless API Routes (`src/app/api/`)
 * **`src/app/api/google-form/route.ts`**:
-  * **Role**: Server-side proxy and retry dispatcher for Google Apps Script Webhooks.
-  * **Key Mechanism**: Protects client requests from CORS issues. Inspects `payload.action`: routes feedback actions to `NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL` and registration actions to `NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL`. Implements an automatic 2-attempt retry loop with an `AbortController` (28-second timeout) to gracefully handle Google Apps Script cold starts.
+  * **Role**: Server-side proxy, retry dispatcher for Google Apps Script Webhooks, and Bitly v4 URL shortener.
+  * **Key Mechanism**:
+    * **Google Apps Script Proxy**: Protects client requests from CORS issues. Inspects `payload.action`: routes feedback actions to `NEXT_PUBLIC_CSI_FEEDBACK_WEBHOOK_URL` and registration actions to `NEXT_PUBLIC_CSI_GOOGLE_WEBHOOK_URL`. Implements an automatic 2-attempt retry loop with an `AbortController` (28-second timeout) to gracefully handle Google Apps Script cold starts.
+    * **Automated Bitly Shortening (`shortenWithBitly`)**: When a Google Form is created (`action: "create_form"`), the route automatically calls Bitly's v4 API (`https://api-ssl.bitly.com/v4/shorten`) with `BITLY_ACCESS_TOKEN` to generate a live branded shortlink (e.g., `https://bit.ly/4Cb4Ctr`) and returns `bitlyUrl`. If the token is absent or Bitly rate limits are reached, it falls back cleanly without breaking form creation.
+    * **Standalone Action (`action: "shorten_url"`)**: Allows the frontend to re-shorten or generate Bitly links on demand.
 * **`src/app/api/convert-pptx/route.ts`**:
   * **Role**: Server-side PowerPoint conversion utility (Windows environments).
   * **Key Mechanism**:
@@ -228,9 +232,9 @@ R:\Downloads\CSI_Operations-main\CSI_Operations-main
   * **Role**: The core synchronization engine.
   * **Key Functions**:
     * `getStoredEvents()`: Synchronously returns cached events from `localStorage` in 0ms. Triggers a background call to `syncEventsWithSupabase()` if more than 20 seconds have elapsed.
-    * `syncEventsWithSupabase()`: Queries Supabase `events` table, merges cloud rows with local fields, updates `localStorage`, and fires `window.dispatchEvent(new CustomEvent("csi_events_updated"))`.
-    * `saveNewEvent(event)`: Creates a new UUID, prepends the event to local storage, fires the update event, increments the assigned coordinators' counts in both LocalStorage and Supabase, and executes `supabase.from('events').insert(...)`.
-    * `updateEvent(event)`: Persists changes (such as added Google Form links or attendee lists) to both LocalStorage and Supabase.
+    * `syncEventsWithSupabase()`: Queries Supabase `events` table, merges cloud rows (including `bitly_url` and `registration_url`) with local fields, updates `localStorage`, and fires `window.dispatchEvent(new CustomEvent("csi_events_updated"))`.
+    * `saveNewEvent(event)`: Creates a new UUID, prepends the event to local storage, fires the update event, increments the assigned coordinators' counts in both LocalStorage and Supabase, and executes `supabase.from('events').insert(...)` persisting all fields including `bitly_url`.
+    * `updateEvent(event)`: Persists changes (such as added Google Form links, `bitly_url`, or attendee lists) to both LocalStorage and Supabase.
     * `deleteEvent(id)`: Removes the event, decrements the coordinator counts, and updates Supabase.
 * **`src/lib/formScriptGenerator.ts`**:
   * **Role**: Code generator and CSV/TSV response mapper for Registration Forms.
@@ -283,11 +287,12 @@ R:\Downloads\CSI_Operations-main\CSI_Operations-main
 * **`supabase/04_rls_policies.sql`**: Row Level Security definitions for authenticated access.
 * **`supabase/05_auto_count_trigger.sql`**: PostgreSQL trigger function (`update_member_event_count`) that automatically recalculates a member's `events_coordinated_count` whenever an assignment row is added or deleted.
 * **`supabase/06_useful_views.sql`**: Database reporting views (`v_events_with_coordinators`, `v_member_workload`, `v_domain_stats`).
-* **`supabase/07_migration_sync.sql`**: **Master Migration Script**. Adds rich columns (time windows, URLs, JSONB attendee arrays, winner objects) to the `events` table and unlocks RLS so the web application can perform live synchronization.
+* **`supabase/07_migration_sync.sql`**: **Master Migration Script**. Adds rich columns (time windows, URLs, `registration_url`, `bitly_url`, JSONB attendee arrays, winner objects) to the `events` table and unlocks RLS so the web application can perform live synchronization.
 * **`supabase/README.md`**: Step-by-step setup documentation for configuring the Supabase project.
 
 #### 7. Project Root Files
-* **`run.bat`**: Windows batch script to launch the local development server at `http://localhost:3000` with one click.
+* **`.env.local`**: Private local environment variables (contains `BITLY_ACCESS_TOKEN`, Google Apps Script webhook URLs, and Supabase keys). Automatically excluded from Git via `.gitignore`.
+* **`run.bat`**: Windows batch script configured with local Node runtime paths to launch the local development server at `http://localhost:3000` with one click.
 * **`package.json`**: Lists third-party dependencies (`next`, `react`, `@supabase/supabase-js`, `jspdf`, `jszip`, `lucide-react`, `qrcode`, `tailwindcss`).
 * **`next.config.mjs`**: Next.js configuration enabling React strict mode and ignoring non-critical build warnings.
 * **`tailwind.config.ts`**: Configures custom colors (`csi-purple`, `csi-surface`, `csi-border`, `csi-card`).
@@ -343,22 +348,23 @@ Here is what happens step-by-step from the moment a user opens the website to ce
        ▼
 [src/app/api/google-form/route.ts]
        │
-       ▼
-[Google Apps Script Master Webhook (scripts/csi_master_webhook.js)]
+       ├──► 1. Calls Google Apps Script Webhook (scripts/csi_master_webhook.js)
+       │         ├──► FormApp.create() creates Registration Form in CSI Google Drive
+       │         ├──► SpreadsheetApp.create() creates Destination Responses Google Sheet
+       │         ├──► Links Form responses to this Google Sheet
+       │         └──► Returns { formUrl, editUrl, sheetUrl, sheetId }
        │
-       ├──► FormApp.create() creates Registration Form in CSI Google Drive
-       │    └── Applies official CSI settings (No email limit, clean branding)
-       ├──► SpreadsheetApp.create() creates Destination Responses Google Sheet
-       ├──► Links Form responses to this Google Sheet
-       │
-       └──► Returns { formUrl, editUrl, sheetUrl, sheetId }
-                 │
-                 ▼
+       └──► 2. Calls Bitly v4 Shorten API (api-ssl.bitly.com/v4/shorten)
+                 ├──► Uses BITLY_ACCESS_TOKEN from .env.local to shorten formUrl
+                 └──► Returns live shortlink (e.g., https://bit.ly/4Cb4Ctr)
+                           │
+                           ▼
 [src/app/events/[id]/page.tsx]
        │
-       ├──► Saves links to event.google_form_url & event.google_sheet_url
-       ├──► Saves links to Supabase via updateEvent()
-       └──► UI reveals: "Live Student Form", "Edit in Forms", and "Sync Final Roster to Attendance"
+       ├──► Saves links to event.google_form_url, event.google_sheet_url & event.bitly_url
+       ├──► Saves links to Supabase & LocalStorage via updateEvent()
+       ├──► UI reveals: "Live Student Form", "Edit in Forms", "Responses Sheet", and Bitly Action Bar
+       └──► Automatically injects Bitly URL into RSMS Notice (PDF, Word, on-screen preview & 1-click clipboard copy)
 
 ─────────────────────────────────────────────────────────────────────────────
 
@@ -456,12 +462,13 @@ This matrix traces how data passes across file boundaries during the 6 core oper
      ```
   5. The modal receives the new ID and calls `router.push('/events/' + newEventId)`.
 
-### Pipeline 3: Google Drive Automation & Form Deployment
+### Pipeline 3: Google Drive Automation, Bitly Shortening & Form Deployment
 * **Participating Files**:
   * `src/app/events/[id]/page.tsx`
   * `src/app/api/google-form/route.ts`
   * `scripts/csi_master_webhook.js`
   * `src/lib/eventsStorage.ts`
+  * `.env.local` (`BITLY_ACCESS_TOKEN`)
 * **Flow Details**:
   1. On the event page, the user clicks **"Create Form in Drive"**.
   2. `page.tsx` sends a POST request to `/api/google-form` with:
@@ -474,8 +481,12 @@ This matrix traces how data passes across file boundaries during the 6 core oper
      * Calls `SpreadsheetApp.create()` to generate the destination responses spreadsheet.
      * Links form submissions to the spreadsheet via `form.setDestination()`.
      * Returns `{ formUrl, editUrl, sheetUrl, sheetId }`.
-  5. `/api/google-form/route.ts` forwards this response back to `page.tsx`.
-  6. `page.tsx` updates the event's `google_form_url` and `google_sheet_url` via `updateEvent()`, persisting them to Supabase and revealing the live form and sheet buttons in the UI.
+  5. `/api/google-form/route.ts` intercepts the response:
+     * Executes `shortenWithBitly(formUrl)` using `BITLY_ACCESS_TOKEN` via Bitly's v4 API.
+     * Attaches `bitlyUrl` to the JSON response (with graceful non-blocking fallback if token is unset or quota is reached).
+     * Forwards the combined payload back to `page.tsx`.
+  6. `page.tsx` updates `event.google_form_url`, `event.google_sheet_url`, and `event.bitly_url` via `updateEvent()`, persisting them to Supabase and LocalStorage.
+  7. Instantly, the UI reveals the Live Form, Edit Form, and Responses Sheet buttons, displays the Bitly link with a 1-click Copy button, and automatically updates the RSMS notice!
 
 ### Pipeline 4: Registration Sync to Attendance & Document Export
 * **Participating Files**:
@@ -538,6 +549,67 @@ This matrix traces how data passes across file boundaries during the 6 core oper
 
 ---
 
+### 5.1 Deep Dive: "Sync Form" vs. "Sync to Certificates"
+
+A common operational point of confusion is the distinction between **"Sync Final Roster to Attendance"** (Pipeline 4) and **"Sync Feedback Responses" / "Sync to Certificates"** (Pipeline 5 & 6). The two pipelines serve distinct phases of the event lifecycle:
+
+| Feature Dimension | "Sync Form" (Attendance Pipeline) | "Sync Feedback / Certificates" (Certificate Studio) |
+| :--- | :--- | :--- |
+| **Operational Stage** | **Pre-Event / Event Check-in** | **Post-Event / Validation** |
+| **Trigger Location** | Single Event Overview (`/events/[id]`) | Feedback Section (`/events/[id]`) & Certificate Studio (`/events/[id]/certificates`) |
+| **Source Data** | Registration Google Form & destination Sheet | Feedback Google Form & destination Sheet |
+| **Data Ingested** | Name, Roll No, Email, Department, Division/Batch | Full Name, Student UID, Branch, NBA PO Likert ratings, Comments |
+| **Event State Target** | `event.registered_attendees` | `event.feedback_attendees` |
+| **Downstream Deliverables**| Formal Sign-in Attendance Sheets (`.docx`, `.pdf`), Principal Permission Letter rosters | NBA/NAAC Outcome Analysis (`.docx`), Winner & Participation Certificates (`.zip` containing `.pptx` + `.pdf`) |
+| **Institutional Purpose** | Verifies student physical presence and faculty approval | Verifies student completion and curriculum attainment for NBA/NAAC accreditation |
+
+---
+
+### 5.2 Deep Dive: Automated Bitly Shortlink Generation & RSMS Notice Distribution
+
+To eliminate the friction of long, messy Google Form links in official college circulars, the CSI Operations platform features zero-touch Bitly v4 shortlinking coupled directly to the RSMS college notice generator:
+
+```
+[User clicks "Create Form in Drive"]
+             │
+             ├──► Google Apps Script creates Form (https://docs.google.com/forms/d/e/.../viewform)
+             │
+             ▼
+[/api/google-form/route.ts]
+             │
+             ├──► Invokes shortenWithBitly(formUrl)
+             │      └──► POST https://api-ssl.bitly.com/v4/shorten
+             │             Headers: Authorization: Bearer {BITLY_ACCESS_TOKEN}
+             │             Body: { "long_url": formUrl, "domain": "bit.ly" }
+             │
+             ├──► Receives: { "link": "https://bit.ly/4Cb4Ctr" }
+             │
+             ▼
+[Supabase & LocalStorage] ──► Persisted to event.bitly_url & event.registration_url
+             │
+             ▼
+[src/app/events/[id]/page.tsx]
+             │
+             ├──► 1. Bitly Action Bar: Displays shortlink, 1-click "Copy Link" with toast feedback
+             ├──► 2. Inline Slug Editor: Coordinators can manually edit or paste custom branded slugs
+             ├──► 3. On-Demand Generator: "Generate Bitly Link" button for existing or externally hosted forms
+             │
+             ▼
+[RSMS Notice Distribution Pipeline]
+             │
+             ├──► RSMS Notice PDF (exportRsmsPdf) ──────────► Embedded clickable Bitly hyperlink
+             ├──► RSMS Notice Word (exportRsmsWord) ────────► Formatted institutional announcement (.docx)
+             ├──► On-Screen Live Preview ───────────────────► Renders notice text with live shortlink
+             └──► 1-Click "Copy Notice" Button ─────────────► Copies complete ready-to-broadcast text to clipboard
+```
+
+#### Key Architecture Principles:
+1. **Graceful Degradation**: If `BITLY_ACCESS_TOKEN` is missing, expired, or rate-limited, form creation still succeeds without throwing errors; `bitlyUrl` simply returns `null` and the UI falls back to the direct Google Form link.
+2. **Effective URL Resolution**: The RSMS Notice uses `effectiveBitlyUrl = event.bitly_url || event.google_form_url || "Link to be updated"`, ensuring notice generation is never blocked even before forms are generated.
+3. **Editable Override**: Even after an automated Bitly link is assigned, coordinators can click the edit pencil icon to type in a custom slug (e.g. `https://bit.ly/CSI-Python-Bootcamp`) and save it immediately to Supabase.
+
+---
+
 ## 6. Supabase Database Schema & Sync Engine
 
 The cloud database uses two primary tables (`events` and `members`) along with optional junction tables and views:
@@ -563,6 +635,8 @@ The cloud database uses two primary tables (`events` and `members`) along with o
 | `google_form_id` | `TEXT` | `NULL` | Google Form ID |
 | `google_sheet_url` | `TEXT` | `NULL` | Destination Google Sheet link for registrations |
 | `google_sheet_id` | `TEXT` | `NULL` | Google Sheet ID |
+| `registration_url` | `TEXT` | `NULL` | Public registration link (Google Form or external) |
+| `bitly_url` | `TEXT` | `NULL` | Branded Bitly shortlink (e.g. `https://bit.ly/4Cb4Ctr`) |
 | `is_registration_closed`| `BOOLEAN` | `false` | Whether registrations are locked |
 | `registered_attendees` | `JSONB` | `'[]'` | Array of registered student objects |
 | `feedback_google_form_url` | `TEXT` | `NULL` | Public Google Form link for feedback |
@@ -647,3 +721,12 @@ On any event page (`/events/[id]`), click the subtle lock icon in the top header
 Bayern Munich
 ```
 This unlocks a hidden panel that uses `COORDINATOR_TEMPLATE_BASE64` and `certificateExport.ts` to generate official coordinator appreciation certificates for all students assigned to lead the event.
+
+### Q5: How do I configure Bitly URL shortening, and what if our club needs custom back-halves?
+* **Configuration**: Add your personal or club Bitly Generic Access Token to `.env.local`:
+  ```bash
+  BITLY_ACCESS_TOKEN=your_v4_bitly_access_token_here
+  ```
+* **Attribution**: All links shortened by the platform are immediately attributed to your Bitly account dashboard where you can monitor click analytics, geographic referrers, and device types.
+* **Custom Back-Halves**: To assign a custom branded back-half (e.g., `bit.ly/csi-hackathon-2025`), either customize it inside the Bitly dashboard or click the inline Edit button next to the Bitly URL on the event page, enter your custom slug, and click Save.
+
